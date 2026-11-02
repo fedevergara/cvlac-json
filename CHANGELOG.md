@@ -4,6 +4,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 
 ## [Sin publicar]
 
+## [0.7.0] - 2026-11-02
+
 ### Cambiado
 - **Cambio de esquema:** `sections` se llama ahora `other_products`, y las patentes (antes `sections["Patentes"]`) pasan a la lista `patents` del nivel superior, siempre presente. `counts` tiene `patents` en lugar de `Patentes`. Las cuatro secciones de apropiación social del conocimiento (Fortalecimiento o solución de asuntos de interés social, Generación de insumos de política pública y normatividad, Fortalecimiento de cadenas productivas, Trabajo conjunto entre un Centro de Ciencia y un grupo de investigación) van juntas en `other_products["Apropiación social del conocimiento"]`; cada ítem conserva su `type`. En `scienti.not_on_page` (o `added_from_scienti`), el conteo `sections` se divide igual en `patents` y `other_products`. En JSON-LD los ítems de `patents` tienen `@type` `Patent` y `@id` `…#/patents/n`; los de `other_products`, `…#/other_products/<sección>/n`. §4 y §13 del esquema.
 
@@ -62,7 +64,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - Tesis dirigidas con título, director, codirectores, estudiantes, institución con ROR, estado y programa.
 - Identificadores Scienti por DOI o título (`--scienti auto|full|off`, `--apikey`).
 
-[Sin publicar]: https://github.com/restrepo/cvlac-json/compare/v0.6.0...HEAD
+[Sin publicar]: https://github.com/restrepo/cvlac-json/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/restrepo/cvlac-json/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/restrepo/cvlac-json/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/restrepo/cvlac-json/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/restrepo/cvlac-json/compare/v0.3.0...v0.4.0
