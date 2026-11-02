@@ -393,6 +393,8 @@ def item_section(data, chain):
                 best, score = sec, k
     if best:
         return best
+    if names[0] == norm("Apropiación social del conocimiento"):
+        return "Apropiación social del conocimiento"  # as parser.merge_asc
     return chain[1][0] if len(chain) > 1 and norm(chain[1][0]) != names[0] else chain[0][0]
 
 

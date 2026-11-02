@@ -40,6 +40,7 @@ MONTHS = {
     )
 }
 PATENTS = "Patentes"  # this section goes to the top-level `patents` list
+ASC = "Apropiación social del conocimiento"  # its CvLAC sections are merged into one other_products list
 # Sections whose items are bibliographic works (mapped to the ImpactU work schema)
 BIBLIO = {
     "artículos",
@@ -789,6 +790,7 @@ def build(page, cod_rh):
             bqs = [bq for _, _, bq in items(dict(secs)[title])]
             if len(bqs) == len(prods[title]):
                 prods[title] = [structure(it, bq, owner) for it, bq in zip(prods[title], bqs, strict=True)]
+    out["other_products"] = prods = merge_asc(prods)
     out["patents"] = prods.pop(PATENTS, [])
     add_owner(out)
     for title, frag in secs:
@@ -797,6 +799,20 @@ def build(page, cod_rh):
             for hdr, endorsed, bq in its:
                 out["works"].append(work_from_item(title, hdr, endorsed, bq, owner, len(out["works"]) + 1))
     count(out)
+    return out
+
+
+def merge_asc(prods):
+    """Put the sections whose items are all social appropriation of knowledge ('Apropiación social del conocimiento -
+    Proceso de ...': Fortalecimiento o solución de asuntos de interés social, Generación de insumos de política
+    pública y normatividad, Fortalecimiento de cadenas productivas, Trabajo conjunto entre un Centro de Ciencia y un
+    grupo de investigación) into one list titled ASC, where the first of them was. Each item keeps its `type`."""
+    out = {}
+    for title, its in prods.items():
+        if its and all((it.get("type") or "").startswith(ASC + " - ") for it in its):
+            out.setdefault(ASC, []).extend(its)
+        else:
+            out.setdefault(title, []).extend(its)
     return out
 
 

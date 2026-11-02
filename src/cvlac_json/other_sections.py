@@ -257,6 +257,12 @@ def structure(it, bq, owner):
     if f.get("Lugar de realización"):  # Talleres creativos: a venue or a city
         out["place"] = clean(f["Lugar de realización"])
 
+    # Par evaluador: 'Ámbito: Nacional Par evaluador de: Proyecto Institución: ...'; Talleres: 'Ámbito: ...'
+    if f.get("Ámbito"):
+        out["scope"] = clean(f["Ámbito"])
+    if f.get("Par evaluador de"):
+        out["review_of"] = clean(f["Par evaluador de"])
+
     # institution / publisher
     inst = f.get("Institución") or f.get("Institución que emite el registro") or f.get("en") or f.get("Titular del registro")
     if f.get("Institución solicitante"):

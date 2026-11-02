@@ -5,11 +5,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 ## [Sin publicar]
 
 ### Cambiado
-- **Cambio de esquema:** `sections` se llama ahora `other_products`, y las patentes (antes `sections["Patentes"]`) pasan a la lista `patents` del nivel superior, siempre presente. `counts` tiene `patents` en lugar de `Patentes`. En `scienti.not_on_page` (o `added_from_scienti`), el conteo `sections` se divide igual en `patents` y `other_products`. En JSON-LD los ítems de `patents` tienen `@type` `Patent` y `@id` `…#/patents/n`; los de `other_products`, `…#/other_products/<sección>/n`. §4 y §13 del esquema.
+- **Cambio de esquema:** `sections` se llama ahora `other_products`, y las patentes (antes `sections["Patentes"]`) pasan a la lista `patents` del nivel superior, siempre presente. `counts` tiene `patents` en lugar de `Patentes`. Las cuatro secciones de apropiación social del conocimiento (Fortalecimiento o solución de asuntos de interés social, Generación de insumos de política pública y normatividad, Fortalecimiento de cadenas productivas, Trabajo conjunto entre un Centro de Ciencia y un grupo de investigación) van juntas en `other_products["Apropiación social del conocimiento"]`; cada ítem conserva su `type`. En `scienti.not_on_page` (o `added_from_scienti`), el conteo `sections` se divide igual en `patents` y `other_products`. En JSON-LD los ítems de `patents` tienen `@type` `Patent` y `@id` `…#/patents/n`; los de `other_products`, `…#/other_products/<sección>/n`. §4 y §13 del esquema.
 
 ### Agregado
 - `authors[]` en todos los ítems de `patents` y `other_products`: las personas listadas en la página o, si no hay ninguna, el dueño solo. Cada autor tiene `affiliations`; las del dueño son, como en las obras, las instituciones de su experiencia cuyo periodo contiene el año del ítem (`year`, o el de `date`), salvo en las tesis, que siguen con la institución de la tesis. Nuevo conteo `products_with_affiliation` en `counts` y en `affiliations_from_experience`.
 - `source` en las patentes, con los datos que siguen a "Gaceta Industrial de Publicación:", separados por rótulo: la parte inicial sin rótulo en `publisher` (número de gaceta, oficina, URL o número de publicación) y cada parte con rótulo en su clave (`gazette`, `publication_date`, `international_publication`, `application_number`…). El número de `Gaceta:` también va a `identifiers` como `gazette`.
+
+- `scope` ("Ámbito") y `review_of` ("Par evaluador de") en los ítems de Par evaluador.
 
 ### Corregido
 - Número de patente: es el texto antes del primer " - ", con sus espacios (`AU 2014313817 B2`, `US 10,085,948 B2`). Antes solo se reconocía sin espacios, y en esos casos el número quedaba dentro del título.

@@ -288,3 +288,20 @@ def test_products_always_have_authors(data):
             assert it["authors"] and all("affiliations" in a for a in it["authors"])
     (owner,) = data["patents"][0]["authors"]  # nobody listed: the owner
     assert owner["id"] == data["cod_rh"] and owner["full_name"] == data["profile"]["Nombre"]
+
+
+def test_peer_review_scope_and_object(data):
+    proj, paper = data["other_products"]["Par evaluador"]
+    assert (proj["scope"], proj["review_of"], proj["institution"]) == ("Nacional", "Proyecto", "UNIVERSIDAD SINTETICA DE PRUEBA")
+    assert (paper["scope"], paper["review_of"]) == ("Internacional", "Material para publicación científica")
+    assert paper["venue"] == "REVISTA SINTETICA DE PRUEBAS" and paper["date"] == "2022-02"
+
+
+def test_social_appropriation_sections_merged(data):
+    prods = data["other_products"]
+    assert "Fortalecimiento o solución de asuntos de interés social" not in prods
+    assert "Fortalecimiento de cadenas productivas" not in prods
+    asc = prods["Apropiación social del conocimiento"]
+    assert [it["title"] for it in asc] == ["Taller sintético de prueba", "Cadena sintética de prueba"]
+    assert asc[1]["type"].endswith("fortalecimiento de cadenas")
+    assert data["counts"]["Apropiación social del conocimiento"] == 2
