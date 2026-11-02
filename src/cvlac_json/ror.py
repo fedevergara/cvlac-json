@@ -14,7 +14,11 @@ as 'FACULTAD DE ...' usually get no ROR. Answers are cached in ~/.cache/cvlac-js
 Then every work, patent and other product (apart from supervised theses, which get the thesis institution) gets,
 on the owner's author entry, one affiliation per institution (merged by ROR id, else by name) whose experience
 period contains the year (works: year_published; patents and other products: year, else the year of date), in the
-ImpactU affiliation shape: {id, name, types, external_ids, addresses, years, cvlac}.
+ImpactU affiliation shape: {id, name, types, external_ids, addresses, years, cvlac}. Projects get the same, from
+every experience period that overlaps the project's span (start year to end, else projected end, else start); a
+project matched in SIIU (UdeA's system) also gets the Universidad de Antioquia when the experience lacks it.
+Events get it on the owner's entry in participants, by the start year. In supervised theses the owner as advisor
+gets the thesis institution; as co-advisor (or with no role), the experience of the thesis year.
 Standard library only.
 """
 
@@ -29,6 +33,7 @@ import urllib.request
 
 ROR_API = "https://api.ror.org/v2/organizations?affiliation={}"
 CACHE = os.path.expanduser("~/.cache/cvlac-json/ror.json")
+UDEA = {"id": "03bp5hc83", "name": "Universidad de Antioquia"}  # SIIU is UdeA's research information system
 YEAR = r"(?<!\d)(1[89]\d\d|20\d\d)(?!\d)"
 
 
@@ -145,6 +150,15 @@ def item_year(it):
         return None
 
 
+def project_span(p):
+    """(first, last) year of a project: start year to end, else projected end, else start; None without a start."""
+    y0 = (p.get("start") or {}).get("year")
+    if not y0:
+        return None
+    y1 = (p.get("end") or p.get("projected_end") or {}).get("year") or y0
+    return y0, max(y0, y1)
+
+
 def thesis_affiliations(data, cache, ror=True, lookup=lookup):
     """Supervised theses: the institution after the title goes, with its ROR id, to the advisor and the student(s)."""
     n = 0
@@ -178,8 +192,41 @@ def thesis_affiliations(data, cache, ror=True, lookup=lookup):
     return n
 
 
+def siiu_affiliations(projects, cod, cache, ror=True, lookup=lookup):
+    """Projects matched in SIIU: the owner gets the Universidad de Antioquia if the experience did not give it."""
+    r = None
+    if ror and projects:
+        try:
+            r = lookup(UDEA["name"], cache)
+        except OSError:
+            r = None
+    if r and r["id"] != UDEA["id"]:
+        r = None
+    n = 0
+    for p in projects:
+        for a in p.get("authors") or []:
+            have = a.get("affiliations") or []
+            if a.get("id") != cod or any(x.get("id") == UDEA["id"] or norm(x.get("name")) == norm(UDEA["name"]) for x in have):
+                continue
+            lo, hi = (p["siiu"].get("siiu_years") or [None, None])[:2]
+            a.setdefault("affiliations", []).append(
+                {
+                    "id": UDEA["id"],
+                    "name": r["name"] if r else UDEA["name"],
+                    "types": r["types"] if r else [],
+                    "external_ids": r["external_ids"] if r else [],
+                    "addresses": r["addresses"] if r else [],
+                    "years": list(range(lo, hi + 1)) if lo and hi else [],
+                    "cvlac": {"provenance": "siiu project", "names": [], "ror_match": r["match"] if r else None},
+                }
+            )
+            n += 1
+    return n
+
+
 def enrich(data, ror=True, progress=None):
-    """Add start_year/end_year/ror to data['experience'] and owner affiliations to works, patents and other products."""
+    """Add start_year/end_year/ror to data['experience'] and owner affiliations to works, projects, patents and other
+    products."""
     cache = _load_cache() if ror else {}
     progress = progress or (lambda stage, done=None, total=None: None)
     names = {norm(e.get("institution")) for e in data.get("experience", []) if e.get("institution")}
@@ -189,6 +236,9 @@ def enrich(data, ror=True, progress=None):
         for it in v
         if isinstance(it.get("institution"), dict) and it["institution"].get("name")
     }
+    siiu_projects = [p for p in data.get("projects", []) if p.get("siiu")]
+    if siiu_projects:
+        names.add(norm(UDEA["name"]))
     names.discard("")
     seen = set()
 
@@ -216,11 +266,11 @@ def enrich(data, ror=True, progress=None):
 
     cod = data["cod_rh"]
 
-    def owner_affiliations(y):
-        """The owner's affiliations in year y: the experience held that year, one per institution."""
+    def owner_affiliations(y0, y1):
+        """The owner's affiliations in the years y0..y1: the experience held then, one per institution."""
         affs = {}
         for e in exp:
-            if not e["start_year"] or not (e["start_year"] <= y <= e["end_year"]):
+            if not e["start_year"] or not (e["start_year"] <= y1 and y0 <= e["end_year"]):
                 continue
             r = cache.get(norm(e["institution"])) if e["ror"] else None
             key = r["id"] if r else norm(e["institution"])
@@ -246,30 +296,44 @@ def enrich(data, ror=True, progress=None):
             a["cvlac"]["periods"].append({"period": e.get("period"), "dedication": e.get("dedication")})
         return list(affs.values())
 
-    def tag(records, year):
+    def tag(records, years, people="authors", keep=False):
+        """Owner affiliations on each record's people; keep=True leaves owners that already have some."""
         n = 0
         for rec in records:
-            y = year(rec)
-            if not y:
+            ys = years(rec)
+            if not ys:
                 continue
-            affs = owner_affiliations(y)
-            for au in rec.get("authors") or []:
-                if au.get("id") == cod:
+            affs = owner_affiliations(*ys)
+            for au in rec.get(people) or []:
+                if au.get("id") == cod and not (keep and au.get("affiliations")):
                     au["affiliations"] = json.loads(json.dumps(affs))
                     n += bool(affs)
         return n
 
-    n_aff = tag(data.get("works", []), lambda w: w.get("year_published"))
+    def one_year(y):
+        return (y, y) if y else None
+
+    n_aff = tag(data.get("works", []), lambda w: one_year(w.get("year_published")))
     data["counts"]["works_with_affiliation"] = n_aff
+    tag(data.get("projects", []), project_span)
+    n_siiu = siiu_affiliations(siiu_projects, cod, cache, ror, lookup=counted_lookup)
+    n_proj = sum(
+        any(a.get("affiliations") for a in p.get("authors") or [] if a.get("id") == cod) for p in data.get("projects", [])
+    )
+    data["counts"]["projects_with_affiliation"] = n_proj
     products = [
         it
         for title, its in product_lists(data)
         for it in its
         if not title.lower().startswith("trabajos dirigidos")  # theses: the thesis institution (below)
     ]
-    n_prod = tag(products, item_year)
+    n_prod = tag(products, lambda it: one_year(item_year(it)))
     data["counts"]["products_with_affiliation"] = n_prod
     n_th = thesis_affiliations(data, cache if ror else {}, ror, lookup=counted_lookup)
+    theses = [it for title, its in product_lists(data) if title.lower().startswith("trabajos dirigidos") for it in its]
+    n_th_exp = tag(theses, lambda it: one_year(item_year(it)), keep=True)  # owner as co-advisor: the experience
+    n_ev = tag(data.get("events", []), lambda ev: one_year(item_year({"date": ev.get("start") or ev.get("end")})), "participants")
+    data["counts"]["events_with_affiliation"] = n_ev
     if ror:
         _save_cache(cache)
     found = sum(1 for e in exp if e.get("ror"))
@@ -278,8 +342,12 @@ def enrich(data, ror=True, progress=None):
         "experience_with_ror": found,
         "experience": len(exp),
         "works_with_affiliation": n_aff,
+        "projects_with_affiliation": n_proj,
+        "projects_with_siiu_affiliation": n_siiu,
         "products_with_affiliation": n_prod,
         "theses_with_affiliation": n_th,
+        "theses_owner_from_experience": n_th_exp,
+        "events_with_affiliation": n_ev,
         "lookup_errors": errors,
     }
     return data

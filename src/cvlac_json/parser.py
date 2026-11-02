@@ -568,7 +568,8 @@ def find_doi(*texts):
 
 def split_authors(s):
     s = re.sub(r"Tipo:\s*[^,\n]*?(?=\n|$)", "", s)  # chapters repeat 'Tipo: ...' after each author
-    return [a for a in (clean(x) for x in re.split(r",\s*\n?|\n", s)) if a and not a.lower().startswith("tipo")]
+    parts = (clean(x) for x in re.split(r",\s*\n?|\n", s))
+    return [a for a in parts if a and not a.lower().startswith("tipo") and ":" not in a]  # not "Nombre del producto: ..."
 
 
 def work_from_item(sec, hdr, endorsed, bq, owner, n):
@@ -792,12 +793,12 @@ def build(page, cod_rh):
                 prods[title] = [structure(it, bq, owner) for it, bq in zip(prods[title], bqs, strict=True)]
     out["other_products"] = prods = merge_asc(prods)
     out["patents"] = prods.pop(PATENTS, [])
-    add_owner(out)
     for title, frag in secs:
         its = items(frag)
         if title.lower() in BIBLIO or any((h or "").startswith("Producción bibliográfica") for h, _, _ in its):
             for hdr, endorsed, bq in its:
                 out["works"].append(work_from_item(title, hdr, endorsed, bq, owner, len(out["works"]) + 1))
+    ensure_owner(out)
     count(out)
     return out
 
@@ -838,18 +839,83 @@ def owner_author(data):
     }
 
 
-def add_owner(data):
-    """Every patent and other product gets `authors`: the people listed on the page, or else the owner alone.
-    Each author has `affiliations` (the owner's are filled from the experience by ror.enrich, as for works)."""
-    for _, its in product_lists(data):
+def owner_names(data):
+    p = data.get("profile") or {}
+    return p.get("Nombre"), p.get("Nombre en citaciones")
+
+
+def is_owner_name(name, data):
+    """The name is the owner's full name or citation name, or has the citation name's words."""
+    na = norm(name)
+    full, cit = (norm(x) for x in owner_names(data))
+    return bool(na) and (na in (full, cit) or (bool(cit) and set(na.split()) == set(cit.split())))
+
+
+def owner_variant(names, data):
+    """Index of the one name that is a shortened form of the owner's ('VICTOR ALONSO MOLINA', 'CANO, L.E'): at
+    least two words, one of them of 3+ letters, every word one of the owner's and every single letter the initial
+    of one of them. None when no name, or more than one, qualifies."""
+    words = {w for n in owner_names(data) for w in norm(n).split()}
+
+    def fits(name):
+        ws = norm(name).split()
+        if len(ws) < 2 or not any(len(w) >= 3 for w in ws):
+            return False
+        return all(w in words if len(w) > 1 else any(x.startswith(w) for x in words) for w in ws)
+
+    hits = [i for i, n in enumerate(names) if fits(n)]
+    return hits[0] if len(hits) == 1 else None
+
+
+def ensure_owner(data):
+    """The CV owner, with the COD_RH, in every work, project, patent, other product and event.
+
+    Projects, patents and other products that list nobody get `authors` with the owner alone. Where people are
+    listed but none is recognized as the owner, a shortened form of the owner's name is taken as the owner
+    (owner_variant); failing that, the owner is added at the end. Event `participants` get `id`, `external_ids`
+    and `affiliations` the same way. Every author has `affiliations` (the owner's are filled from the experience
+    by ror.enrich). The last two cases are counted in counts.owner_by_name_variant and counts.owner_added."""
+    cod = data["cod_rh"]
+    ext = [{"provenance": "cvlac", "source": "scienti", "id": cod}]
+    variant = added = 0
+    for its in [data.get("works") or [], data.get("projects") or [], *(v for _, v in product_lists(data))]:
         for it in its:
             if not it.get("authors"):
                 head = {k: it[k] for k in ("type", "endorsed", "title") if k in it}
                 rest = {k: v for k, v in it.items() if k not in head and k != "authors"}
                 it.clear()
                 it.update({**head, "authors": [owner_author(data)], **rest})
-            for a in it["authors"]:
+            au = it["authors"]
+            if not any(a.get("id") == cod for a in au):
+                i = owner_variant([a.get("full_name") for a in au], data)
+                if i is None:
+                    au.append(owner_author(data))
+                    added += 1
+                else:
+                    au[i].update(id=cod, external_ids=list(ext))
+                    variant += 1
+            for a in au:
                 a.setdefault("affiliations", [])
+    for ev in data.get("events") or []:
+        ps = ev.setdefault("participants", [])
+        for p in ps:
+            p.setdefault("id", None)
+            p.setdefault("external_ids", [])
+            p.setdefault("affiliations", [])
+        if any(p["id"] == cod for p in ps):
+            continue
+        i = next((i for i, p in enumerate(ps) if is_owner_name(p.get("name"), data)), None)
+        if i is None:
+            i = owner_variant([p.get("name") for p in ps], data)
+            variant += i is not None
+        if i is None:
+            ps.append({"name": owner_names(data)[0], "role": None, "id": cod, "external_ids": list(ext), "affiliations": []})
+            added += 1
+        else:
+            ps[i].update(id=cod, external_ids=list(ext))
+    c = data.setdefault("counts", {})
+    c["owner_by_name_variant"] = c.get("owner_by_name_variant", 0) + variant
+    c["owner_added"] = c.get("owner_added", 0) + added
 
 
 def count(out):
@@ -873,7 +939,14 @@ def count(out):
     n = sum(it.get("origin") == "scienti" for _, v in product_lists(out) for it in v)
     if n:
         c["section_items_only_in_scienti"] = n
-    for k in ("works_with_affiliation", "products_with_affiliation"):
+    for k in (
+        "works_with_affiliation",
+        "projects_with_affiliation",
+        "products_with_affiliation",
+        "events_with_affiliation",
+        "owner_by_name_variant",
+        "owner_added",
+    ):
         if k in old:
             c[k] = old[k]
     out["counts"] = c
@@ -992,7 +1065,7 @@ def extract(
             )
         except RuntimeError as e:
             log(f"scienti: skipped ({e})")
-        add_owner(data)  # items added from Scienti
+        ensure_owner(data)  # records added from Scienti
     ror_affiliations.enrich(data, ror=ror, progress=progress)
     progress("Finishing")
     count(data)

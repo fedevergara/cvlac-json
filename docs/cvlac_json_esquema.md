@@ -181,6 +181,8 @@ Incluye las secciones Artículos, Libros, Capítulos de libro, Textos en publica
 | `external_ids[]` | array | `{provenance: "cvlac", source: "scienti", id: COD_RH}` para el dueño. |
 | `affiliations[]` | array | Solo el dueño: instituciones de su experiencia cuyo periodo contiene `year_published` (§16). Los coautores no tienen afiliación (la página no la da). |
 
+**El dueño está en todos los registros.** En obras, proyectos, patentes y demás productos (y en los `participants` de los eventos), el dueño del CV aparece siempre, con su COD_RH. Se reconoce por su nombre completo o su nombre en citaciones (o las mismas palabras de este). Si ninguna persona listada lo es, se toma como dueño la única que sea una forma abreviada de su nombre: al menos dos palabras, una de tres letras o más, todas del nombre del dueño, y cada inicial suelta la de una de ellas ("VICTOR ALONSO MOLINA", "CANO, L.E"). Si tampoco hay una, el dueño se agrega al final de la lista. Los dos casos se cuentan en `counts.owner_by_name_variant` y `counts.owner_added`. Las partes con rótulo ("Nombre del producto: …") no son autores.
+
 **`works[].cvlac`**
 
 | Campo | Tipo | Descripción |
@@ -200,6 +202,7 @@ Incluye las secciones Artículos, Libros, Capítulos de libro, Textos en publica
 | --- | --- | --- | --- |
 | `type` | string | Tipo de proyecto | "Investigación y desarrollo" |
 | `title` | string | Título | "Plataforma sintética para pruebas" |
+| `authors[]` | array | **Siempre presente.** El dueño del CV solo (la página no lista a los demás participantes), con la forma de §10: `{full_name, id, external_ids, affiliations}`. `affiliations` son las instituciones de su experiencia cuyo periodo se cruza con el del proyecto (año de inicio a `end`, o `projected_end`, o solo el inicio) y, si el proyecto coincide con uno de SIIU y la experiencia no da la UdeA, la Universidad de Antioquia con `cvlac.provenance: "siiu project"` y los años de SIIU (§16). | `[{"full_name": "Ana María Pérez Gómez", "id": "0000000001", …}]` |
 | `start` | object | `{year, month}` | `{"year": 1998, "month": 1}` |
 | `end` | object o null | `{year, month}` de finalización | |
 | `projected_end` | object o null | `{year, month}` de finalización proyectada | |
@@ -223,7 +226,7 @@ El CvLAC no enlaza proyectos con productos: no presente un proyecto como fuente 
 | `place` | string o null | Lugar | "Medellín - Universidad de Antioquia" |
 | `products[]` | array | Productos asociados: `{name, type}` (único vínculo explícito producto–actividad del CvLAC) | |
 | `institutions[]` | array | `{name, link}`; `link` es el tipo de vínculo ("Patrocinadora", "Gestionadora") | |
-| `participants[]` | array | `{name, role}` | `{"name": "ANA MARIA PEREZ GOMEZ", "role": "Ponente"}` |
+| `participants[]` | array | `{name, role, id, external_ids, affiliations}`. El dueño, reconocido por su nombre como en las obras (§10), lleva su COD_RH en `id` y en `external_ids`, y en `affiliations` las instituciones de su experiencia cuyo periodo contiene el año de `start` (o de `end`) (§16); si no está en la lista, se agrega al final con `role: null`. Los demás tienen `id: null`, `external_ids: []` y `affiliations: []`. | `{"name": "ANA MARIA PEREZ GOMEZ", "role": "Ponente", "id": "0000000001", …}` |
 | `scienti` | object o null | Coincidencia con un evento Scienti (§17) | |
 
 ## 13. `patents` y `other_products`: patentes y demás productos
@@ -347,7 +350,7 @@ Dirigió como: Tutor principal, Persona(s) orientada(s): Carlos Andrés Ruiz Mej
 | `type` | string | `advisor`: el dueño, si "Dirigió como" es "Tutor principal" (o falta). `co-advisor`: el dueño, si es "Cotutor/asesor", y las demás personas de "Tutor(es)/Cotutor(es)" distintas del dueño y de los estudiantes. `student`: las "Persona(s) orientada(s)". Cuando el dueño es solo cotutor, la página no dice quién fue el tutor principal y todos los demás tutores quedan como `co-advisor`. |
 | `id` | string o null | COD_RH del dueño; `null` para los demás. |
 | `external_ids[]` | array | El COD_RH del dueño. |
-| `affiliations[]` | array | Para `advisor` y `student`: la institución de la tesis con su ROR, `years: [año]` y `cvlac.provenance: "cvlac thesis"`. Los cotutores no tienen afiliación. |
+| `affiliations[]` | array | Para `advisor` y `student`: la institución de la tesis con su ROR, `years: [año]` y `cvlac.provenance: "cvlac thesis"`. El dueño como cotutor (o sin rol): las instituciones de su experiencia cuyo periodo contiene el año de la tesis, como en las obras (§16). Los demás cotutores no tienen afiliación. |
 
 ## 15. `counts`
 
@@ -361,6 +364,9 @@ Objeto de conteos (enteros):
 | `<título de sección>` | Ítems de cada sección de `other_products`. |
 | `endorsed_works` | Obras con la marca de verificación. |
 | `works_with_affiliation` | Obras con al menos una afiliación del dueño. |
+| `projects_with_affiliation` | Proyectos con al menos una afiliación del dueño. |
+| `events_with_affiliation` | Eventos con al menos una afiliación del dueño en `participants`. |
+| `owner_by_name_variant`, `owner_added` | Registros en que el dueño se reconoció por una forma abreviada de su nombre, o se agregó porque no estaba en la lista (§10). |
 | `products_with_affiliation` | Patentes y demás productos (sin las tesis) con al menos una afiliación del dueño. |
 | `works_only_in_scienti`, `section_items_only_in_scienti`, … | Solo con `--scienti full`. |
 
@@ -375,12 +381,14 @@ Las afiliaciones siguen la forma de ImpactU:
 | `types[]` | array | `{source: "ror", type}`: tipos ROR, p. ej. `education`, `funder` (los únicos vistos en los cinco CV), `company`, `government`. |
 | `external_ids[]` | array | `{provenance: "ror", source, id}`: `ror` (URL), `grid`, `isni`, `wikidata`, `fundref`. |
 | `addresses[]` | array | `{city, country, country_code}` del registro ROR. |
-| `years[]` | array de integer | En obras, patentes y demás productos: todos los años de los periodos de experiencia. En tesis: el año de la tesis. |
-| `cvlac` | object | `provenance` ("cvlac experience" o "cvlac thesis"), `names[]` (nombres del CvLAC), `periods[]` (`{period, dedication}`, solo experiencia), `ror_match`. |
+| `years[]` | array de integer | En obras, proyectos, patentes y demás productos: todos los años de los periodos de experiencia. En tesis: el año de la tesis. Con SIIU: los años del proyecto en SIIU. |
+| `cvlac` | object | `provenance` ("cvlac experience", "cvlac thesis" o "siiu project"), `names[]` (nombres del CvLAC), `periods[]` (`{period, dedication}`, solo experiencia), `ror_match`. |
 
-En las obras, patentes y demás productos (salvo las tesis, que llevan la institución de la tesis), la afiliación del dueño se calcula igual, con el año de la obra (`year_published`) o del ítem (`year`, o el año de `date`). Es **inferida**: significa "el dueño trabajaba allí ese año", no que el CvLAC declare dónde se hizo la obra. Con dos empleos simultáneos aparecen ambos; varias entradas de la misma institución se fusionan en una.
+En las obras, patentes, demás productos y eventos (salvo las tesis dirigidas como tutor, que llevan la institución de la tesis), la afiliación del dueño se calcula igual, con el año de la obra (`year_published`), del ítem (`year`, o el año de `date`) o del evento (`start`, o `end`). Sin año (casi todos los ítems de Jurado en comités de evaluación, Participación en comités de evaluación, Asesorías y Secretos empresariales, que la página publica sin fecha) o sin experiencia en ese año, el dueño queda con `affiliations: []`. Es **inferida**: significa "el dueño trabajaba allí ese año", no que el CvLAC declare dónde se hizo la obra. Con dos empleos simultáneos aparecen ambos; varias entradas de la misma institución se fusionan en una.
 
-`affiliations_from_experience` resume el proceso: `ror_api`, `experience` (entradas de experiencia), `experience_with_ror`, `works_with_affiliation`, `products_with_affiliation`, `theses_with_affiliation`, `lookup_errors`.
+Un proyecto dura varios años, así que el dueño recibe las instituciones de todos los periodos de experiencia que se cruzan con el del proyecto: del año de inicio al de `end` (o de `projected_end`, o solo el de inicio). Los proyectos sin año de inicio no tienen afiliación. Si el proyecto coincide con uno de SIIU (§17), que es el sistema de la UdeA, y la experiencia no da la Universidad de Antioquia (porque el CvLAC no está al día, por ejemplo), se agrega con `cvlac.provenance: "siiu project"` y, en `years`, los años del proyecto en SIIU. En los 4.596 CvLAC de la UdeA, la regla de la experiencia da la UdeA en 3.139 de los 3.634 proyectos con código de SIIU; SIIU agrega los otros 495.
+
+`affiliations_from_experience` resume el proceso: `ror_api`, `experience` (entradas de experiencia), `experience_with_ror`, `works_with_affiliation`, `projects_with_affiliation`, `projects_with_siiu_affiliation` (proyectos a los que SIIU agregó la UdeA), `products_with_affiliation`, `theses_with_affiliation`, `theses_owner_from_experience` (tesis en que el dueño es cotutor y su afiliación sale de la experiencia), `events_with_affiliation`, `lookup_errors`.
 
 ## 17. Coincidencias con Scienti y SIIU
 

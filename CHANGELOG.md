@@ -4,6 +4,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 
 ## [Sin publicar]
 
+### Agregado
+- `authors[]` en los proyectos: el dueño del CV, con `affiliations`, las instituciones de su experiencia cuyo periodo se cruza con el del proyecto (año de inicio a fin, o fin proyectado). Si el proyecto coincide con uno de SIIU y la experiencia no da la Universidad de Antioquia, se agrega con `cvlac.provenance: "siiu project"`. Nuevos conteos `projects_with_affiliation` (en `counts` y en `affiliations_from_experience`) y `projects_with_siiu_affiliation`. §11 y §16 del esquema.
+- El dueño del CV, con su COD_RH y su afiliación, en todos los registros. En los eventos, `participants[]` tiene ahora `id`, `external_ids` y `affiliations`: el dueño lleva su COD_RH y las instituciones de su experiencia en el año del evento. En las tesis en que el dueño es cotutor (o no tiene rol), su afiliación sale de la experiencia en el año de la tesis; antes quedaba vacía (7.940 tesis en los CvLAC de la UdeA). Si el dueño no se reconoce entre las personas listadas, se busca una forma abreviada de su nombre ("VICTOR ALONSO MOLINA") y, si no hay, se agrega al final; conteos `owner_by_name_variant` y `owner_added`, y `events_with_affiliation`. §10, §12, §14, §15 y §16 del esquema.
+
+### Corregido
+- Obras en formatos con rótulos y título entre comillas: las partes "Nombre del producto: …", "Nombre del libro: …" se tomaban como autores.
+
 ## [0.7.0] - 2026-11-02
 
 ### Cambiado
