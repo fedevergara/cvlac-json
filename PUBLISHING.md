@@ -84,7 +84,7 @@ La versión sale de la etiqueta de git (con `hatch-vcs`): no hay que editarla en
    git push origin v0.1.0
    ```
 
-4. En **Actions → Release** verá tres jobs: `build` (construye y revisa el paquete y que la versión coincida con la etiqueta), `publish-pypi` (sube a PyPI; espera su aprobación si activó *Required reviewers*) y `github-release` (crea la página de la versión en GitHub con los archivos).
+4. En **Actions → Release** verá cuatro jobs: `build` (construye y revisa el paquete y que la versión coincida con la etiqueta), `test` (instala la rueda construida, sin el código fuente, en Linux con Python 3.10 y 3.14 y en Windows y macOS con 3.13, y corre `tests/test_juguete.py` sobre la página de juguete; si falla, no se publica nada), `publish-pypi` (sube a PyPI; espera su aprobación si activó *Required reviewers*) y `github-release` (crea la página de la versión en GitHub con los archivos).
 5. Pruebe la instalación:
 
    ```bash

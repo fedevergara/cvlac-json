@@ -93,7 +93,7 @@ python -m pytest
 ruff check . && ruff format --check .
 ```
 
-Las pruebas no usan la red: corren sobre una página sintética (`tests/fixtures/cvlac_sintetico.html`) con una persona ficticia y la misma estructura HTML del CvLAC.
+Las pruebas no usan la red: corren sobre páginas con personas ficticias y la misma estructura HTML del CvLAC. `tests/fixtures/cvlac_sintetico.html` es la página sintética de las pruebas unitarias; `tests/fixtures/cvlac_juguete.html`, una página de juguete con cada tipo de registro (obras, proyectos, eventos, patentes, tesis, jurados) y dos empleos, para las pruebas de extremo a extremo de `tests/test_juguete.py`, que pasan por `extract()` y por el comando. El flujo de publicación (Release) corre esas pruebas sobre la rueda construida antes de subirla a PyPI.
 
 Cómo publicar una versión nueva en PyPI: [PUBLISHING.md](PUBLISHING.md).
 
