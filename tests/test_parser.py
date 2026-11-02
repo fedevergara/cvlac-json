@@ -4,7 +4,7 @@ import pytest
 
 from cvlac_json import extract, normalize_cod_rh
 from cvlac_json.other_sections import gazette_source
-from cvlac_json.parser import build, find_doi, items, product_lists, work_from_item
+from cvlac_json.parser import build, ensure_owner, find_doi, items, owner_variant, product_lists, split_authors, work_from_item
 
 COD = "0000000001"
 
@@ -308,3 +308,39 @@ def test_social_appropriation_sections_merged(data):
     assert [it["title"] for it in asc] == ["Taller sintético de prueba", "Cadena sintética de prueba"]
     assert asc[1]["type"].endswith("fortalecimiento de cadenas")
     assert data["counts"]["Apropiación social del conocimiento"] == 2
+
+
+def test_split_authors_drops_labels():
+    assert split_authors("ANA PEREZ, \nNombre del producto: Cartilla, LUIS TORRES") == ["ANA PEREZ", "LUIS TORRES"]
+
+
+def test_owner_variant():
+    data = {"profile": {"Nombre": "Víctor Alonso Molina Bedoya", "Nombre en citaciones": "MOLINA BEDOYA, VÍCTOR ALONSO"}}
+    assert owner_variant(["LIDA OSORIO", "VICTOR ALONSO MOLINA"], data) == 1
+    assert owner_variant(["MOLINA, V.A"], data) == 0  # initials of the owner's names
+    assert owner_variant(["MOLINA, J"], data) is None  # J is no initial of the owner
+    assert owner_variant(["ALONSO MOLINA", "VICTOR MOLINA"], data) is None  # two candidates: none
+    assert owner_variant(["V A"], data) is None  # needs a word of 3+ letters
+
+
+def test_owner_in_every_record(data):
+    recs = [*data["works"], *data["projects"], *(it for _, v in product_lists(data) for it in v)]
+    assert recs and all(sum(a.get("id") == COD for a in r["authors"]) == 1 for r in recs)
+
+
+def test_owner_added_or_found_by_variant():
+    data = {
+        "cod_rh": COD,
+        "profile": {"Nombre": "Ana María Pérez Gómez", "Nombre en citaciones": "PÉREZ GÓMEZ, ANA MARÍA"},
+        "works": [{"authors": [{"full_name": "ANA PEREZ", "id": "", "external_ids": []}, {"full_name": "LUIS TORRES"}]}],
+        "other_products": {"Demás trabajos": [{"title": "x", "authors": [{"full_name": "LUIS TORRES", "id": None}]}]},
+        "events": [{"name": "e", "participants": [{"name": "LUIS TORRES", "role": "Asistente"}]}, {"name": "f"}],
+    }
+    ensure_owner(data)
+    assert data["works"][0]["authors"][0]["id"] == COD  # "ANA PEREZ": a shortened form of the owner's name
+    (luis, owner) = data["other_products"]["Demás trabajos"][0]["authors"]  # not listed: added at the end
+    assert luis["id"] is None and owner["id"] == COD and owner["affiliations"] == []
+    luis, owner = data["events"][0]["participants"]
+    assert luis["id"] is None and luis["affiliations"] == [] and (owner["name"], owner["id"]) == ("Ana María Pérez Gómez", COD)
+    assert data["events"][1]["participants"][0]["id"] == COD
+    assert data["counts"] == {"owner_by_name_variant": 1, "owner_added": 3}

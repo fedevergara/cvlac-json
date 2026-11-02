@@ -1,5 +1,5 @@
 from cvlac_json import extract, ror
-from cvlac_json.parser import build
+from cvlac_json.parser import build, ensure_owner
 
 UDEA = {
     "id": "https://ror.org/03bp5hc83",
@@ -84,6 +84,9 @@ def test_enrich_with_mocked_ror(page, monkeypatch):
     assert student["affiliations"][0]["id"] == "03bp5hc83"
     co = next(a for a in thesis["authors"] if a["type"] == "co-advisor")
     assert co["affiliations"] == []
+    co_owner = data["other_products"]["Trabajos dirigidos/tutorías"][1]["authors"][0]  # 2018, owner co-advisor
+    assert co_owner["type"] == "co-advisor" and co_owner["id"] == "0000000001"
+    assert [(a["id"], a["cvlac"]["provenance"]) for a in co_owner["affiliations"]] == [("03bp5hc83", "cvlac experience")]
     (owner,) = data["patents"][0]["authors"]  # patents and other products: as works, by the item's year
     assert owner["affiliations"] and owner["affiliations"][0]["cvlac"]["provenance"] == "cvlac experience"
     assert data["counts"]["products_with_affiliation"] >= 1
@@ -113,3 +116,16 @@ def test_project_overlap_and_siiu_affiliation(page):
     assert data["affiliations_from_experience"]["projects_with_siiu_affiliation"] == 1
     ror.siiu_affiliations(data["projects"][:1], "0000000001", {}, ror=False)  # UdeA already there: not repeated
     assert len(owner["affiliations"]) == 2
+
+
+def test_event_participant_affiliation(page):
+    data = build(page, "0000000001")
+    data["events"] = [
+        {"name": "Simposio", "start": "2016-05-02", "participants": [{"name": "Ana María Pérez Gómez", "role": "Ponente"}]}
+    ]
+    ensure_owner(data)
+    ror.enrich(data, ror=False)
+    (p,) = data["events"][0]["participants"]
+    assert p["id"] == "0000000001" and p["external_ids"][0]["id"] == "0000000001"
+    assert [a["name"] for a in p["affiliations"]] == ["UNIVERSIDAD DE ANTIOQUIA"]  # 2016: UdeA (2015-), no ROR
+    assert data["counts"]["events_with_affiliation"] == 1

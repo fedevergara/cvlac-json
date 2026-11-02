@@ -17,6 +17,8 @@ period contains the year (works: year_published; patents and other products: yea
 ImpactU affiliation shape: {id, name, types, external_ids, addresses, years, cvlac}. Projects get the same, from
 every experience period that overlaps the project's span (start year to end, else projected end, else start); a
 project matched in SIIU (UdeA's system) also gets the Universidad de Antioquia when the experience lacks it.
+Events get it on the owner's entry in participants, by the start year. In supervised theses the owner as advisor
+gets the thesis institution; as co-advisor (or with no role), the experience of the thesis year.
 Standard library only.
 """
 
@@ -294,15 +296,16 @@ def enrich(data, ror=True, progress=None):
             a["cvlac"]["periods"].append({"period": e.get("period"), "dedication": e.get("dedication")})
         return list(affs.values())
 
-    def tag(records, years):
+    def tag(records, years, people="authors", keep=False):
+        """Owner affiliations on each record's people; keep=True leaves owners that already have some."""
         n = 0
         for rec in records:
             ys = years(rec)
             if not ys:
                 continue
             affs = owner_affiliations(*ys)
-            for au in rec.get("authors") or []:
-                if au.get("id") == cod:
+            for au in rec.get(people) or []:
+                if au.get("id") == cod and not (keep and au.get("affiliations")):
                     au["affiliations"] = json.loads(json.dumps(affs))
                     n += bool(affs)
         return n
@@ -327,6 +330,10 @@ def enrich(data, ror=True, progress=None):
     n_prod = tag(products, lambda it: one_year(item_year(it)))
     data["counts"]["products_with_affiliation"] = n_prod
     n_th = thesis_affiliations(data, cache if ror else {}, ror, lookup=counted_lookup)
+    theses = [it for title, its in product_lists(data) if title.lower().startswith("trabajos dirigidos") for it in its]
+    n_th_exp = tag(theses, lambda it: one_year(item_year(it)), keep=True)  # owner as co-advisor: the experience
+    n_ev = tag(data.get("events", []), lambda ev: one_year(item_year({"date": ev.get("start") or ev.get("end")})), "participants")
+    data["counts"]["events_with_affiliation"] = n_ev
     if ror:
         _save_cache(cache)
     found = sum(1 for e in exp if e.get("ror"))
@@ -339,6 +346,8 @@ def enrich(data, ror=True, progress=None):
         "projects_with_siiu_affiliation": n_siiu,
         "products_with_affiliation": n_prod,
         "theses_with_affiliation": n_th,
+        "theses_owner_from_experience": n_th_exp,
+        "events_with_affiliation": n_ev,
         "lookup_errors": errors,
     }
     return data
