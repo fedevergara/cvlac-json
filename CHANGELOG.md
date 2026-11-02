@@ -4,6 +4,9 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 
 ## [Sin publicar]
 
+### Agregado
+- `authors[]` en los proyectos: el dueño del CV, con `affiliations`, las instituciones de su experiencia cuyo periodo se cruza con el del proyecto (año de inicio a fin, o fin proyectado). Si el proyecto coincide con uno de SIIU y la experiencia no da la Universidad de Antioquia, se agrega con `cvlac.provenance: "siiu project"`. Nuevos conteos `projects_with_affiliation` (en `counts` y en `affiliations_from_experience`) y `projects_with_siiu_affiliation`. §11 y §16 del esquema.
+
 ## [0.7.0] - 2026-11-02
 
 ### Cambiado

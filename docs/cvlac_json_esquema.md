@@ -200,6 +200,7 @@ Incluye las secciones Artículos, Libros, Capítulos de libro, Textos en publica
 | --- | --- | --- | --- |
 | `type` | string | Tipo de proyecto | "Investigación y desarrollo" |
 | `title` | string | Título | "Plataforma sintética para pruebas" |
+| `authors[]` | array | **Siempre presente.** El dueño del CV solo (la página no lista a los demás participantes), con la forma de §10: `{full_name, id, external_ids, affiliations}`. `affiliations` son las instituciones de su experiencia cuyo periodo se cruza con el del proyecto (año de inicio a `end`, o `projected_end`, o solo el inicio) y, si el proyecto coincide con uno de SIIU y la experiencia no da la UdeA, la Universidad de Antioquia con `cvlac.provenance: "siiu project"` y los años de SIIU (§16). | `[{"full_name": "Ana María Pérez Gómez", "id": "0000000001", …}]` |
 | `start` | object | `{year, month}` | `{"year": 1998, "month": 1}` |
 | `end` | object o null | `{year, month}` de finalización | |
 | `projected_end` | object o null | `{year, month}` de finalización proyectada | |
@@ -361,6 +362,7 @@ Objeto de conteos (enteros):
 | `<título de sección>` | Ítems de cada sección de `other_products`. |
 | `endorsed_works` | Obras con la marca de verificación. |
 | `works_with_affiliation` | Obras con al menos una afiliación del dueño. |
+| `projects_with_affiliation` | Proyectos con al menos una afiliación del dueño. |
 | `products_with_affiliation` | Patentes y demás productos (sin las tesis) con al menos una afiliación del dueño. |
 | `works_only_in_scienti`, `section_items_only_in_scienti`, … | Solo con `--scienti full`. |
 
@@ -375,12 +377,14 @@ Las afiliaciones siguen la forma de ImpactU:
 | `types[]` | array | `{source: "ror", type}`: tipos ROR, p. ej. `education`, `funder` (los únicos vistos en los cinco CV), `company`, `government`. |
 | `external_ids[]` | array | `{provenance: "ror", source, id}`: `ror` (URL), `grid`, `isni`, `wikidata`, `fundref`. |
 | `addresses[]` | array | `{city, country, country_code}` del registro ROR. |
-| `years[]` | array de integer | En obras, patentes y demás productos: todos los años de los periodos de experiencia. En tesis: el año de la tesis. |
-| `cvlac` | object | `provenance` ("cvlac experience" o "cvlac thesis"), `names[]` (nombres del CvLAC), `periods[]` (`{period, dedication}`, solo experiencia), `ror_match`. |
+| `years[]` | array de integer | En obras, proyectos, patentes y demás productos: todos los años de los periodos de experiencia. En tesis: el año de la tesis. Con SIIU: los años del proyecto en SIIU. |
+| `cvlac` | object | `provenance` ("cvlac experience", "cvlac thesis" o "siiu project"), `names[]` (nombres del CvLAC), `periods[]` (`{period, dedication}`, solo experiencia), `ror_match`. |
 
 En las obras, patentes y demás productos (salvo las tesis, que llevan la institución de la tesis), la afiliación del dueño se calcula igual, con el año de la obra (`year_published`) o del ítem (`year`, o el año de `date`). Es **inferida**: significa "el dueño trabajaba allí ese año", no que el CvLAC declare dónde se hizo la obra. Con dos empleos simultáneos aparecen ambos; varias entradas de la misma institución se fusionan en una.
 
-`affiliations_from_experience` resume el proceso: `ror_api`, `experience` (entradas de experiencia), `experience_with_ror`, `works_with_affiliation`, `products_with_affiliation`, `theses_with_affiliation`, `lookup_errors`.
+Un proyecto dura varios años, así que el dueño recibe las instituciones de todos los periodos de experiencia que se cruzan con el del proyecto: del año de inicio al de `end` (o de `projected_end`, o solo el de inicio). Los proyectos sin año de inicio no tienen afiliación. Si el proyecto coincide con uno de SIIU (§17), que es el sistema de la UdeA, y la experiencia no da la Universidad de Antioquia (porque el CvLAC no está al día, por ejemplo), se agrega con `cvlac.provenance: "siiu project"` y, en `years`, los años del proyecto en SIIU. En los 4.596 CvLAC de la UdeA, la regla de la experiencia da la UdeA en 3.139 de los 3.634 proyectos con código de SIIU; SIIU agrega los otros 495.
+
+`affiliations_from_experience` resume el proceso: `ror_api`, `experience` (entradas de experiencia), `experience_with_ror`, `works_with_affiliation`, `projects_with_affiliation`, `projects_with_siiu_affiliation` (proyectos a los que SIIU agregó la UdeA), `products_with_affiliation`, `theses_with_affiliation`, `lookup_errors`.
 
 ## 17. Coincidencias con Scienti y SIIU
 

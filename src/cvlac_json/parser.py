@@ -839,9 +839,10 @@ def owner_author(data):
 
 
 def add_owner(data):
-    """Every patent and other product gets `authors`: the people listed on the page, or else the owner alone.
-    Each author has `affiliations` (the owner's are filled from the experience by ror.enrich, as for works)."""
-    for _, its in product_lists(data):
+    """Every project, patent and other product gets `authors`: the people listed on the page, or else the owner
+    alone (projects list nobody). Each author has `affiliations` (the owner's are filled from the experience by
+    ror.enrich, as for works)."""
+    for its in [data.get("projects") or [], *(v for _, v in product_lists(data))]:
         for it in its:
             if not it.get("authors"):
                 head = {k: it[k] for k in ("type", "endorsed", "title") if k in it}
@@ -873,7 +874,7 @@ def count(out):
     n = sum(it.get("origin") == "scienti" for _, v in product_lists(out) for it in v)
     if n:
         c["section_items_only_in_scienti"] = n
-    for k in ("works_with_affiliation", "products_with_affiliation"):
+    for k in ("works_with_affiliation", "projects_with_affiliation", "products_with_affiliation"):
         if k in old:
             c[k] = old[k]
     out["counts"] = c

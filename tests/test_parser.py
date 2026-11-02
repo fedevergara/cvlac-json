@@ -119,6 +119,9 @@ def test_project(data):
     assert p["start"] == {"year": 2019, "month": 3}
     assert p["end"] == {"year": 2021, "month": 2}
     assert p["duration_months"] == 24
+    (owner,) = p["authors"]  # the page lists nobody: the owner alone, after the title
+    assert owner["id"] == "0000000001" and "affiliations" in owner
+    assert list(p)[:3] == ["type", "title", "authors"]
 
 
 def test_counts(data):
