@@ -42,12 +42,13 @@ def test_items_are_json_pointers(data):
     doc = to_jsonld(data, base=BASE)
     assert doc["works"][0]["@id"] == f"{BASE}{COD}#/works/0"
     assert doc["projects"][0]["@type"] == "schema:ResearchProject"
-    title, items = next(iter(doc["sections"].items()))
-    assert items[0]["@id"] == BASE + COD + pointer("sections", title, 0)
+    title, items = next(iter(doc["other_products"].items()))
+    assert items[0]["@id"] == BASE + COD + pointer("other_products", title, 0)
+    assert doc["patents"][1]["@id"] == f"{BASE}{COD}#/patents/1" and doc["patents"][1]["@type"] == "Patent"
 
 
 def test_pointer_escapes():
-    assert pointer("sections", "Trabajos dirigidos/tutorías", 0) == "#/sections/Trabajos%20dirigidos~1tutor%C3%ADas/0"
+    assert pointer("other_products", "Trabajos dirigidos/tutorías", 0) == "#/other_products/Trabajos%20dirigidos~1tutor%C3%ADas/0"
     assert pointer("a~b") == "#/a~0b"
 
 

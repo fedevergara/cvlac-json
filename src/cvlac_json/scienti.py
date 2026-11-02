@@ -366,12 +366,24 @@ def item_from_scienti(p, pid, chain):
     }
 
 
+def product_lists(data):
+    """(section title, items) of `patents` and of every `other_products` section."""
+    return [("Patentes", data.get("patents") or []), *(data.get("other_products") or {}).items()]
+
+
+def product_list(data, title):
+    """The item list of one section: `patents` for Patentes, else other_products[title] (created when missing)."""
+    if title == "Patentes":
+        return data.setdefault("patents", [])
+    return data.setdefault("other_products", {}).setdefault(title, [])
+
+
 def item_section(data, chain):
     """CvLAC section whose items share the Scienti type path (longest common prefix), else a section named after it."""
     names = [norm(n) for n, _ in chain]
     need = min(2, len(names))  # the root alone ("Producción técnica") is not enough
     best, score = None, need - 1
-    for sec, items in data["sections"].items():
+    for sec, items in product_lists(data):
         for it in items:
             if it.get("origin") == "scienti":
                 continue
@@ -381,6 +393,8 @@ def item_section(data, chain):
                 best, score = sec, k
     if best:
         return best
+    if names[0] == norm("Apropiación social del conocimiento"):
+        return "Apropiación social del conocimiento"  # as parser.merge_asc
     return chain[1][0] if len(chain) > 1 and norm(chain[1][0]) != names[0] else chain[0][0]
 
 
@@ -403,7 +417,7 @@ def work_section(data, chain):
 def add_from_scienti(data, products, used, projects, events, networks, owner_id):
     """Put every Scienti record that no CvLAC entry matched into the section it belongs to (origin: 'scienti')."""
     owner_name = (data.get("profile") or {}).get("Nombre") or owner_id
-    added = {"works": 0, "sections": {}, "projects": 0, "events": 0, "networks": 0}
+    added = {"works": 0, "patents": 0, "other_products": {}, "projects": 0, "events": 0, "networks": 0}
     for p in products:
         pid = f"{p['COD_RH']}-{p['COD_PRODUCTO']}"
         if pid in used:
@@ -415,8 +429,11 @@ def add_from_scienti(data, products, used, projects, events, networks, owner_id)
             added["works"] += 1
         else:
             sec = item_section(data, chain) if chain else "Otros productos (Scienti)"
-            data["sections"].setdefault(sec, []).append(item_from_scienti(p, pid, chain))
-            added["sections"][sec] = added["sections"].get(sec, 0) + 1
+            product_list(data, sec).append(item_from_scienti(p, pid, chain))
+            if sec == "Patentes":
+                added["patents"] += 1
+            else:
+                added["other_products"][sec] = added["other_products"].get(sec, 0) + 1
     tagged = lambda lst: {e["scienti"]["id"] for e in lst if e.get("scienti")}
     have = tagged(data["projects"])
     for r in projects:
@@ -460,13 +477,13 @@ def add_from_scienti(data, products, used, projects, events, networks, owner_id)
             }
         )
         added["events"] += 1
-    nets = data["sections"].get("Redes de conocimiento especializado", [])
+    nets = (data.get("other_products") or {}).get("Redes de conocimiento especializado", [])
     have = tagged(nets)
     for r in networks:
         rid = f"{r['COD_RH']}-{r['COD_RED']}"
         if rid in have:
             continue
-        data["sections"].setdefault("Redes de conocimiento especializado", []).append(
+        product_list(data, "Redes de conocimiento especializado").append(
             {
                 "type": "Redes de conocimiento especializado",
                 "title": r.get("TXT_NME_RED"),
@@ -568,7 +585,7 @@ def enrich(data, cod_rh, institution=None, model_year=None, add_records=False, k
             n_works += 1
             w["external_ids"].append({"provenance": "scienti", "source": "scienti", "id": pid})
     n_items = 0
-    for _sec, items in data["sections"].items():
+    for _sec, items in product_lists(data):
         for it in items:
             txt = it.get("text", "")
             res = match_entry(
@@ -597,7 +614,7 @@ def enrich(data, cod_rh, institution=None, model_year=None, add_records=False, k
         lambda r: r.get("TXT_NME_EVENTO"),
         lambda r: r.get("NRO_ANO_REALIZACION") or year_of(r.get("DTA_INICIO")),
     )
-    nets = data["sections"].get("Redes de conocimiento especializado", [])
+    nets = (data.get("other_products") or {}).get("Redes de conocimiento especializado", [])
     for it in nets:  # name and creation year from the generic item
         it["_name"] = (it.get("fields") or {}).get("Nombre de la red")
     n_net = tag(
@@ -643,7 +660,7 @@ def enrich(data, cod_rh, institution=None, model_year=None, add_records=False, k
         f"scienti ({inst} {my}): products {n_used}/{len(index)} matched (works {n_works}, other items {n_items}); "
         f"projects {n_proj}/{len(projects)}, events {n_ev}/{len(events)}, networks {n_net}/{len(networks)}; "
         f"{'added from' if add_records else 'only in'} Scienti: works {added['works']}, "
-        f"section items {sum(added['sections'].values())}, projects {added['projects']}, "
+        f"patents {added['patents']}, other products {sum(added['other_products'].values())}, projects {added['projects']}, "
         f"events {added['events']}, networks {added['networks']}"
     )
     if siiu:

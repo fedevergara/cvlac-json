@@ -6,9 +6,9 @@ clear and to the cvlac-json vocabulary otherwise.
 
 - Keys that are page labels ('Nombre en citaciones', 'Categoría'...) get their own terms, with the label
   percent-encoded in the IRI. Open dictionaries of labels (``counts``, ``fields``) stay JSON literals.
-- ``sections`` is an index map: each item gets a ``section`` property with its section title.
+- ``other_products`` is an index map: each item gets a ``section`` property with its section title.
 - ``authors`` is an ordered list, so the citation order survives in RDF.
-- Works, projects, events and section items get an ``@id`` made of the profile IRI and a JSON Pointer to
+- Works, projects, events, patents and other products get an ``@id`` made of the profile IRI and a JSON Pointer to
   their place in the document: ``<profile IRI>#/works/0``.
 """
 
@@ -35,12 +35,17 @@ _TERMS = {
     "doi": {"@id": "schema:sameAs", "@type": "@id"},
     "counts": {"@type": "@json"},
     "fields": {"@type": "@json"},
-    "sections": {"@container": "@index", "@index": "section"},
+    "other_products": {"@container": "@index", "@index": "section"},
     "Nombre": "schema:name",
     "Nacionalidad": "schema:nationality",
     "Sexo": "schema:gender",
 }
-_ITEMS = (("works", "schema:CreativeWork"), ("projects", "schema:ResearchProject"), ("events", "schema:Event"))
+_ITEMS = (
+    ("works", "schema:CreativeWork"),
+    ("projects", "schema:ResearchProject"),
+    ("events", "schema:Event"),
+    ("patents", "Patent"),
+)
 
 
 def context(vocab=VOCAB, labels=()):
@@ -60,7 +65,10 @@ def context(vocab=VOCAB, labels=()):
 
 
 def pointer(*parts):
-    """JSON Pointer fragment (RFC 6901), percent-encoded for an IRI: pointer('sections', 'A/B', 0) -> '#/sections/A~1B/0'."""
+    """JSON Pointer fragment (RFC 6901), percent-encoded for an IRI.
+
+    pointer('other_products', 'A/B', 0) -> '#/other_products/A~1B/0'
+    """
     return "#" + "".join("/" + quote(str(p).replace("~", "~0").replace("/", "~1"), safe="~") for p in parts)
 
 
@@ -76,10 +84,10 @@ def to_jsonld(data, base=None, vocab=VOCAB):
     for key, typ in _ITEMS:
         for i, item in enumerate(doc.get(key) or []):
             item["@id"], item["@type"] = iri + pointer(key, i), typ
-    for title, items in (doc.get("sections") or {}).items():
+    for title, items in (doc.get("other_products") or {}).items():
         for i, item in enumerate(items or []):
             if isinstance(item, dict):
-                item["@id"] = iri + pointer("sections", title, i)
+                item["@id"] = iri + pointer("other_products", title, i)
     return {
         "@context": context(vocab, labels=doc.get("profile") or {}),
         "@id": iri,

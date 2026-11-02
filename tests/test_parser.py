@@ -3,7 +3,8 @@ import datetime as dt
 import pytest
 
 from cvlac_json import extract, normalize_cod_rh
-from cvlac_json.parser import build, find_doi, items, work_from_item
+from cvlac_json.other_sections import gazette_source
+from cvlac_json.parser import build, find_doi, items, product_lists, work_from_item
 
 COD = "0000000001"
 
@@ -30,7 +31,7 @@ def test_build_rejects_page_without_sections():
 def test_top_level(data):
     assert data["cod_rh"] == COD
     assert data["url"].endswith(f"cod_rh={COD}")
-    for key in ("profile", "education", "experience", "works", "projects", "events", "sections", "counts"):
+    for key in ("profile", "education", "experience", "works", "projects", "events", "patents", "other_products", "counts"):
         assert key in data
 
 
@@ -91,7 +92,7 @@ def test_no_fields_cvlac_never_has(data):
 
 
 def test_thesis_advisor(data):
-    phd, _msc = data["sections"]["Trabajos dirigidos/tutorías"]
+    phd, _msc = data["other_products"]["Trabajos dirigidos/tutorías"]
     assert phd["title"] == "Análisis de datos sintéticos para la evaluación de algoritmos (Caso de estudio)"
     assert phd["status"] == "ongoing" and phd["status_text"] == "Tesis en curso"
     assert phd["program"] == "Doctorado en Ingeniería Electrónica"
@@ -105,7 +106,7 @@ def test_thesis_advisor(data):
 
 
 def test_thesis_owner_as_co_advisor(data):
-    msc = data["sections"]["Trabajos dirigidos/tutorías"][1]
+    msc = data["other_products"]["Trabajos dirigidos/tutorías"][1]
     assert msc["status"] == "completed"
     assert msc["role"] == "Coturor/asesor"
     assert [a["type"] for a in msc["authors"]] == ["co-advisor", "student"]
@@ -214,7 +215,7 @@ def test_labeled_book_year_from_presentation_date():
 
 
 def test_section_coauthors_and_contract(data):
-    (c,) = data["sections"]["Consultorías"]
+    (c,) = data["other_products"]["Consultorías"]
     assert c["title"] == "Diagnóstico sintético de calidad de datos, para pruebas"
     assert [(a["full_name"], a["id"]) for a in c["authors"]] == [
         ("ANA MARIA PEREZ GOMEZ", data["cod_rh"]),
@@ -227,7 +228,7 @@ def test_section_coauthors_and_contract(data):
 
 
 def test_section_course(data):
-    (c,) = data["sections"]["Cursos de corta duración"]
+    (c,) = data["other_products"]["Cursos de corta duración"]
     assert c["title"] == "Curso sintético de análisis de datos"
     assert c["purpose"] == "Formar analistas de prueba"
     assert c["institution"] == "UNIVERSIDAD DE ANTIOQUIA" and c["role"] == "Docente"
@@ -235,7 +236,7 @@ def test_section_course(data):
 
 
 def test_section_sequence_links_and_accession(data):
-    (s,) = data["sections"]["Nueva secuencia genética"]
+    (s,) = data["other_products"]["Nueva secuencia genética"]
     assert s["title"] == "Organismo sintético gen X, partial cds"
     assert s["date"] == "2016-06" and s["city"] == "MEDELLÍN" and s["database"] == "GenBank"
     assert [x["url"] for x in s["links"]] == ["https://www.ncbi.nlm.nih.gov/nuccore/MG000001.1"]
@@ -243,8 +244,64 @@ def test_section_sequence_links_and_accession(data):
 
 
 def test_section_patent(data):
-    (p,) = data["sections"]["Patentes"]
+    assert "Patentes" not in data["other_products"] and data["counts"]["patents"] == 2
+    p = data["patents"][0]
     assert p["title"] == "MÉTODO SINTÉTICO DE PRUEBA"
     assert p["date"] == "2020-12-07" and p["country"] == "Colombia"
     assert p["holder"] == "UNIVERSIDAD DE ANTIOQUIA"
     assert p["identifiers"] == [{"source": "patent", "id": "NC2020/0000001"}, {"source": "gazette", "id": "39514"}]
+    assert p["source"]["publisher"] == "39514"  # other keys are null: harmonized with the second patent
+
+
+def test_patent_number_with_spaces_and_gazette_publisher(data):
+    q = data["patents"][1]
+    assert q["identifiers"][0] == {"source": "patent", "id": "AU 2099000001 B2"}  # up to the first ' - '
+    assert q["title"] == "Synthetic Test Method - Second Part"
+    assert q["source"] == {  # 'value label: value label: value', with '· ' or ' ' between items
+        "publisher": "AU2099000001B2",
+        "publication_date": "2018-06-14",
+        "international_publication": "WO2099000001A1",
+    }
+
+
+def test_gazette_source():
+    assert gazette_source(" Gaceta: 880 Fecha de Publicación: 10 dic 2019,") == {
+        "gazette": "880",
+        "publication_date": "10 dic 2019",
+    }
+    assert gazette_source(" Numero 620, fecha: 20/09/2010, np:106,") == {
+        "publisher": "Numero 620",
+        "date": "20/09/2010",
+        "np": "106",
+    }
+    assert gazette_source(" Superintendencia de Industria y Comercio Gaceta: 854,") == {
+        "publisher": "Superintendencia de Industria y Comercio",
+        "gazette": "854",
+    }
+    assert gazette_source(" https://www.uspto.gov/,") == {"publisher": "https://www.uspto.gov"}
+    assert gazette_source(" No aplica,") == {}
+
+
+def test_products_always_have_authors(data):
+    for _, its in product_lists(data):
+        for it in its:
+            assert it["authors"] and all("affiliations" in a for a in it["authors"])
+    (owner,) = data["patents"][0]["authors"]  # nobody listed: the owner
+    assert owner["id"] == data["cod_rh"] and owner["full_name"] == data["profile"]["Nombre"]
+
+
+def test_peer_review_scope_and_object(data):
+    proj, paper = data["other_products"]["Par evaluador"]
+    assert (proj["scope"], proj["review_of"], proj["institution"]) == ("Nacional", "Proyecto", "UNIVERSIDAD SINTETICA DE PRUEBA")
+    assert (paper["scope"], paper["review_of"]) == ("Internacional", "Material para publicación científica")
+    assert paper["venue"] == "REVISTA SINTETICA DE PRUEBAS" and paper["date"] == "2022-02"
+
+
+def test_social_appropriation_sections_merged(data):
+    prods = data["other_products"]
+    assert "Fortalecimiento o solución de asuntos de interés social" not in prods
+    assert "Fortalecimiento de cadenas productivas" not in prods
+    asc = prods["Apropiación social del conocimiento"]
+    assert [it["title"] for it in asc] == ["Taller sintético de prueba", "Cadena sintética de prueba"]
+    assert asc[1]["type"].endswith("fortalecimiento de cadenas")
+    assert data["counts"]["Apropiación social del conocimiento"] == 2

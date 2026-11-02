@@ -1,11 +1,13 @@
-"""Structured fields for the items of the other CvLAC sections (`sections`, apart from supervised theses).
+"""Structured fields for the items of the other CvLAC sections (`patents` and `other_products`, apart from supervised theses).
 
 Each item keeps `type`, `endorsed`, `text`, `fields`, `keywords`, `areas`, `sectors` and `year`, and gains, when the
 text has them:
   title, authors[] (each person listed before the title; the owner gets the COD_RH), country, city, institution,
   publisher, date (YYYY-MM-DD, YYYY-MM or YYYY), duration ({value, unit}), pages, role, purpose,
-  identifiers[] ({source, id}: contract/registration, patent, NIT, register numbers, accession, DOI, ISBN, ISSN)
-  and links[] (URLs written in the text, besides any <a> link).
+  identifiers[] ({source, id}: contract/registration, patent, NIT, register numbers, accession, DOI, ISBN, ISSN),
+  links[] (URLs written in the text, besides any <a> link) and, for patents, source (the items after
+  "Gaceta Industrial de Publicación:": publisher, publication_date, international_publication..., gazette_source).
+A patent's number is the text before the first " - " (spaces kept: 'AU 2014313817 B2 - Ionic Gelation...').
 `fields` values that ran into the next, unlabeled part of the text (". En: Colombia, ,2017, 0 meses p.") are cut.
 
 Authors come from the page layout: the CvLAC writes each person on its own source line, ending in a comma and a run
@@ -57,6 +59,56 @@ ID_FIELDS = {
 EMPTY = {"", "n/a", "na", "no aplica", "ninguno", "null", "0", "-"}
 # words that appear in titles but not in names
 NOT_NAME = {"EN", "PARA", "Y", "EL", "CON", "POR", "A", "UN", "UNA", "SOBRE", "SU", "AL", "QUE", "THE", "OF", "AND"}
+
+
+# labels written after "Gaceta Industrial de Publicación:" in patents, and their key in `source`
+GAZETTE_LABELS = {
+    "international application number": "international_application",
+    "international application no.": "international_application",
+    "international publication date": "publication_date",
+    "fecha de publicación": "publication_date",
+    "publicación internacional": "international_publication",
+    "número de solicitud": "application_number",
+    "application number": "application_number",
+    "nº de publicación": "publication_number",
+    "pub. no.": "publication_number",
+    "referencia pct": "international_application",
+    "resolución": "resolution",
+    "gaceta": "gazette",
+    "fecha": "date",
+}
+GAZETTE_LABEL = re.compile(
+    r"(?<![\w/])("
+    + "|".join(re.escape(k) for k in sorted(GAZETTE_LABELS, key=len, reverse=True))
+    + r"|[A-Za-zÁÉÍÓÚÑáéíóúñ][\w/.º°]*)\s*:(?!//)",
+    re.I,
+)
+SEP = " ,.;·/-"
+
+
+def gazette_source(tail):
+    """`source` of a patent from the text after "Gaceta Industrial de Publicación:".
+
+    The text is 'value label: value label: value...', with ',', ', . ', '· ' or ' ' between items:
+    'AU2014313817B2· Fecha de publicación: 2018-06-14 Publicación Internacional: WO2015028920A1,'
+    -> {publisher: 'AU2014313817B2', publication_date: '2018-06-14', international_publication: 'WO2015028920A1'}.
+    The unlabeled first part is the publisher; known labels get English keys (GAZETTE_LABELS), others keep
+    the label as written ('np', 'S/REF', 'Folios').
+    """
+    tail = _flat(tail)
+    marks = list(GAZETTE_LABEL.finditer(tail))
+    parts = [(None, tail[: marks[0].start()] if marks else tail)]
+    for i, m in enumerate(marks):
+        end = marks[i + 1].start() if i + 1 < len(marks) else len(tail)
+        parts.append((m.group(1), tail[m.end() : end]))
+    out = {}
+    for label, value in parts:
+        value = value.strip(SEP)
+        if not value or value.lower() in EMPTY:
+            continue
+        key = "publisher" if label is None else GAZETTE_LABELS.get(label.lower(), label)
+        out.setdefault(key, value)
+    return out
 
 
 def _flat(s):
@@ -169,7 +221,9 @@ def structure(it, bq, owner):
 
     # title
     title = next((clean(f[k]) for k in TITLE_FIELDS if f.get(k)), None)
-    m_pat = re.match(r"(\S+)\s+-\s+(.+?),\s*Institución:", flat)  # Patentes: 'NC2020/0015295 - TITLE, Institución:'
+    patent = "Gaceta Industrial de Publicación:" in flat or "solicitante de la patente:" in flat
+    # Patentes: 'NC2020/0015295 - TITLE, Institución:' / 'AU 2014313817 B2 - TITLE, Institución:'
+    m_pat = re.match(r"(.+?)\s+-\s+(.+?),\s*Institución:", flat) if patent else None
     m_quote = re.match(r'"+(.+?)"\s*Fecha de presentación', body)  # Boletines
     if not title and m_pat:
         title = clean(m_pat.group(2))
@@ -202,6 +256,12 @@ def structure(it, bq, owner):
         out["city"] = clean(m.group(1))
     if f.get("Lugar de realización"):  # Talleres creativos: a venue or a city
         out["place"] = clean(f["Lugar de realización"])
+
+    # Par evaluador: 'Ámbito: Nacional Par evaluador de: Proyecto Institución: ...'; Talleres: 'Ámbito: ...'
+    if f.get("Ámbito"):
+        out["scope"] = clean(f["Ámbito"])
+    if f.get("Par evaluador de"):
+        out["review_of"] = clean(f["Par evaluador de"])
 
     # institution / publisher
     inst = f.get("Institución") or f.get("Institución que emite el registro") or f.get("en") or f.get("Titular del registro")
@@ -278,6 +338,12 @@ def structure(it, bq, owner):
     m = re.search(r"Gaceta Industrial de Publicación:\s*(\d+)", flat)
     if m:
         _add_id(ids, "gazette", m.group(1))
+    m = re.search(r"Gaceta Industrial de Publicación:\s*(.*)$", flat)
+    src = gazette_source(m.group(1)) if m else None
+    if src:
+        out["source"] = src
+        if src.get("gazette"):
+            _add_id(ids, "gazette", src["gazette"])
     db = f.get("Base de datos donde está incluido el registro") or f.get(
         "Nombre de base de datos donde está incluido el registro"
     )

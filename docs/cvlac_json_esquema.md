@@ -30,7 +30,7 @@ Con la configuración por defecto, **todo registro proviene de la página públi
 
 ## 2. Convenciones generales
 
-- **Los mismos campos en todos los registros de una colección.** En `works`, `projects`, `events`, `experience`, cada lista de `education` y cada lista de `sections`, si un campo tiene valor en algún registro, aparece en todos: vale `[]` (listas) o `null` (lo demás) donde no hay dato. Lo mismo dentro de los objetos anidados (`source`, `cvlac`, `authors[]`, `affiliations[]`…).
+- **Los mismos campos en todos los registros de una colección.** En `works`, `projects`, `events`, `patents`, `experience`, cada lista de `education` y cada lista de `other_products`, si un campo tiene valor en algún registro, aparece en todos: vale `[]` (listas) o `null` (lo demás) donde no hay dato. Lo mismo dentro de los objetos anidados (`source`, `cvlac`, `authors[]`, `affiliations[]`…).
 - **Campos vacíos en toda la colección se eliminan** de esa colección. Por eso las claves pueden variar de un CV a otro (por ejemplo, un CV sin palabras clave no tiene `keywords` en sus `works`).
 - **Campos que el CvLAC nunca publica no existen**: no hay `abstracts`, `citations_count`, `groups`, `ranking`, `language` ni `date_published`.
 - **Fechas**: año y mes como enteros (`{"year": 2014, "month": 7}`), o cadenas ISO `AAAA-MM-DD` en eventos. No hay fechas en segundos (a diferencia de ImpactU).
@@ -45,11 +45,11 @@ Con la configuración por defecto, **todo registro proviene de la página públi
 | COD_RH (Scienti/CvLAC) | 10 dígitos | `0000000001` | `cod_rh`; `authors[].id` del dueño del CV |
 | Obra del CvLAC | `cvlac:COD_RH:n` (n = orden en la página) | `cvlac:0000000001:1` | `works[].id` |
 | Obra solo en Scienti (`--scienti full`) | `scienti:COD_RH-COD_PRODUCTO` | `scienti:0000000001-10` | `works[].id` |
-| Producto Scienti | `COD_RH-COD_PRODUCTO` | `0000000001-20912` | `works[].external_ids`, `works[].cvlac.scienti.id`, `sections.*[].scienti.id` |
+| Producto Scienti | `COD_RH-COD_PRODUCTO` | `0000000001-20912` | `works[].external_ids`, `works[].cvlac.scienti.id`, `patents[].scienti.id`, `other_products.*[].scienti.id` |
 | Proyecto Scienti | `COD_RH-COD_PROYECTO` | `0000000001-1` | `projects[].scienti.id`, `projects[].external_ids` |
 | Proyecto SIIU (UdeA) | `AAAA-n` | `2014-361` | `projects[].siiu.id`, `projects[].external_ids` |
 | Evento Scienti | `COD_RH-COD_EVENTO` | `0000000001-4` | `events[].scienti.id` |
-| Red Scienti | `COD_RH-COD_RED` | | `sections["Redes de conocimiento especializado"][].scienti.id` |
+| Red Scienti | `COD_RH-COD_RED` | | `other_products["Redes de conocimiento especializado"][].scienti.id` |
 | ROR | id corto (9 caracteres) y URL | `03bp5hc83`, `https://ror.org/03bp5hc83` | `affiliations[].id`, `affiliations[].external_ids`, `experience[].ror.id`, `institution.id` |
 | DOI | sin prefijo en `external_ids`, como URL en `doi` | `10.9999/synthetic.2017.003` | `works[]` |
 
@@ -72,7 +72,8 @@ Con la configuración por defecto, **todo registro proviene de la página públi
 | `works` | array | **Producción bibliográfica** en el esquema de obras de ImpactU (§10). |
 | `projects` | array | Proyectos (§11). |
 | `events` | array | Eventos científicos (§12). |
-| `sections` | object | Las demás secciones del CV, por título (§13); las tesis dirigidas tienen campos estructurados (§14). |
+| `patents` | array | **Patentes** (la sección Patentes del CvLAC), con número, título, oficina, fechas, solicitante y gaceta (§13). Siempre presente; `[]` si no hay. |
+| `other_products` | object | **Demás productos**: las demás secciones del CV, por título (§13); las tesis dirigidas tienen campos estructurados (§14). Hasta 0.6.0 se llamaba `sections` e incluía Patentes. |
 | `counts` | object | Conteos (§15). |
 | `affiliations_from_experience` | object | Resumen de la búsqueda ROR y las afiliaciones asignadas (§16). |
 | `scienti` | object | Resumen del cruce con Scienti; solo con clave de apis.colav.co (§17). |
@@ -225,23 +226,29 @@ El CvLAC no enlaza proyectos con productos: no presente un proyecto como fuente 
 | `participants[]` | array | `{name, role}` | `{"name": "ANA MARIA PEREZ GOMEZ", "role": "Ponente"}` |
 | `scienti` | object o null | Coincidencia con un evento Scienti (§17) | |
 
-## 13. `sections`: demás secciones
+## 13. `patents` y `other_products`: patentes y demás productos
 
-Objeto cuyas claves son los títulos de sección del CvLAC y cuyos valores son listas de ítems. En los 4.596 CvLAC de la UdeA aparecen 49 secciones, entre ellas: Trabajos dirigidos/tutorías, Jurado en comités de evaluación, Par evaluador, Cursos de corta duración, Participación en comités de evaluación, Informes de investigación, Demás trabajos, Consultorías, Nueva secuencia genética, Ediciones/revisiones, Informes técnicos, Redes de conocimiento especializado, Softwares, Prototipos, Producciones de contenido digital, Patentes, Boletines, Normas y Regulaciones, Secretos empresariales, Signos distintivos, Empresas de base tecnológica y Concepto técnico.
+- **`patents`** (nivel superior) es la lista de ítems de la sección Patentes del CvLAC.
+- **`other_products`** es un objeto cuyas claves son los títulos de las demás secciones del CvLAC y cuyos valores son listas de ítems. En los 4.596 CvLAC de la UdeA aparecen 48 secciones además de Patentes, entre ellas: Trabajos dirigidos/tutorías, Jurado en comités de evaluación, Par evaluador, Cursos de corta duración, Participación en comités de evaluación, Informes de investigación, Demás trabajos, Consultorías, Nueva secuencia genética, Ediciones/revisiones, Informes técnicos, Redes de conocimiento especializado, Softwares, Prototipos, Producciones de contenido digital, Boletines, Normas y Regulaciones, Secretos empresariales, Signos distintivos, Empresas de base tecnológica y Concepto técnico. Las cuatro secciones de apropiación social del conocimiento (Fortalecimiento o solución de asuntos de interés social, Generación de insumos de política pública y normatividad, Fortalecimiento de cadenas productivas, Trabajo conjunto entre un Centro de Ciencia y un grupo de investigación), cuyos ítems tienen `type` "Apropiación social del conocimiento - Proceso de …", van juntas en una sola lista, "Apropiación social del conocimiento", donde estaba la primera; cada ítem conserva su `type`, que dice de cuál viene. Los productos de divulgación pública de la ciencia (contenido digital, transmedia, desarrollos web), que el menú del CvLAC también pone bajo "Apropiación social", siguen en sus propias secciones.
 
-Cada ítem guarda el texto y, además, los campos estructurados que se puedan leer de él (desde 0.6.0). Las tesis dirigidas tienen sus propios campos (§14).
+Hasta la versión 0.6.0 ambos iban juntos en `sections` (las patentes en `sections["Patentes"]`).
+
+Los ítems de `patents` y de `other_products` tienen la misma forma: el texto y, además, los campos estructurados que se puedan leer de él. Las tesis dirigidas tienen sus propios campos (§14).
 
 | Campo | Tipo | Descripción |
 | --- | --- | --- |
 | `type` | string | Tipo de producto del CvLAC, niveles separados por " - " (p. ej. "Producción técnica - Cursos de corta duración dictados - Extensión extracurricular"). En Asesorías y Secretos empresariales la página pone ahí el nombre del producto. Falta si toda la sección lo tiene vacío. |
 | `endorsed` | boolean | Marca de verificación. |
 | `title` | string o null | Nombre del producto: el texto entre las personas y el primer dato rotulado, o el valor de "Nombre del producto", "Titulo", "Nombre de la red", "Nombre del evento"… |
-| `authors[]` | array | Personas escritas antes del título, en orden. La página pone cada una en su propia línea, terminada en coma, y así se separan del título aunque este tenga comas. Cada una es `{full_name, id, external_ids}`; el dueño del CV lleva su COD_RH en `id` y en `external_ids`, las demás `id: null`. En Jurado en comités de evaluación son los jurados (`type: "jury"`) y los orientados (`type: "student"`). |
+| `authors[]` | array | **Siempre presente.** Las personas escritas antes del título, en orden; si la página no lista a nadie, el dueño del CV solo. La página pone cada persona en su propia línea, terminada en coma, y así se separan del título aunque este tenga comas. Cada una es `{full_name, id, external_ids, affiliations}`, como en las obras (§10): el dueño lleva su COD_RH en `id` y en `external_ids`, y en `affiliations` las instituciones de su experiencia cuyo periodo contiene el año del ítem (`year`, o el de `date`) (§16); las demás personas tienen `id: null` y `affiliations: []`. En Jurado en comités de evaluación son los jurados (`type: "jury"`) y los orientados (`type: "student"`). |
 | `country`, `city` | string | País ("En: Colombia") y ciudad ("En: MEDELLÍN", "Ciudad: …"). |
 | `place` | string | Lugar de realización (Talleres creativos). |
 | `institution` | string | Institución del ítem: la de "Institución", la solicitante de un concepto técnico, la que emite un registro, la del curso o el comité ("en: …"). |
 | `publisher` | string | Editorial o entidad tras el año en Ediciones/revisiones. |
+| `source` | object | Solo patentes: los datos que siguen a "Gaceta Industrial de Publicación:" hasta el final del ítem. Tienen la forma `valor rótulo: valor rótulo: valor…`, separados por ",", ", . ", "· " o " ". La parte inicial sin rótulo es `publisher`: un número de gaceta ("849 del 18 de enero de 2019"), una oficina, una URL o un número de publicación. Cada parte con rótulo es una clave más: los rótulos conocidos llevan nombre en inglés (`gazette` ← Gaceta, `publication_date` ← Fecha de publicación o International Publication date, `date` ← Fecha, `international_publication` ← Publicación internacional, `publication_number` ← Nº de publicación o Pub. No., `application_number` ← Número de solicitud o Application Number, `international_application` ← International Application Number o No., `resolution` ← Resolución), y los demás conservan el rótulo como está escrito (`np`, `S/REF`, `Folios`). Así, "AU2014313817B2· Fecha de publicación: 2018-06-14 Publicación Internacional: WO2015028920A1" da `{"publisher": "AU2014313817B2", "publication_date": "2018-06-14", "international_publication": "WO2015028920A1"}`. Como en todo registro, las claves que tiene alguna patente del CV están en todas (en `null` si faltan). Falta si no hay ningún dato (vacío, "N/A", "No aplica"). |
 | `venue` | string | Revista o editorial evaluada (Par evaluador). |
+| `scope` | string | "Ámbito": Local, Municipal, Departamental, Nacional o Internacional (Par evaluador, Boletines, Talleres Creativos). |
+| `review_of` | string | "Par evaluador de": lo que se evaluó, p. ej. "Proyecto" o "Material para publicación científica" (Par evaluador). |
 | `program` | string | Programa académico del trabajo evaluado (Jurado). |
 | `date` | string | Fecha ISO: `AAAA-MM-DD`, `AAAA-MM` o `AAAA`, de "Fecha de presentación", "Fecha de inicio", "Creada el", "En: Junio - 2016", la fecha de la patente… |
 | `duration` | object | `{value, unit}` con unidad `meses`, `semanas`, `horas` o `días`; no aparece si vale 0. |
@@ -251,7 +258,7 @@ Cada ítem guarda el texto y, además, los campos estructurados que se puedan le
 | `holder` | string | Titular: solicitante de la patente, titular del signo distintivo o del secreto empresarial. |
 | `database` | string | Base de datos de una secuencia o un registro científico (GenBank, ENA, Index Fungorum…). |
 | `platform`, `environment` | string | Plataforma y ambiente de un software. |
-| `identifiers[]` | array | `{source, id}`. `source`: `contract/registration` (contrato/registro), `patent`, `gazette` (Gaceta Industrial), `registration` (signos, INVIMA), `nit`, `concept number`, `trade secret`, `copyright registration` (Dirección Nacional de Derechos de Autor), `accession` (palabras clave con forma de número de acceso, en secuencias), `doi`, `isbn`, `issn`. |
+| `identifiers[]` | array | `{source, id}`. `source`: `contract/registration` (contrato/registro), `patent` (en `patents`: el texto antes del primer " - ", con sus espacios: `AU 2014313817 B2`, `US 10,085,948 B2`, `NC2020/0015295`; los guiones sin espacios, como en `10-1784319`, son parte del número), `gazette` (número de la Gaceta Industrial: el texto si empieza por cifras, o el valor de `Gaceta:`), `registration` (signos, INVIMA), `nit`, `concept number`, `trade secret`, `copyright registration` (Dirección Nacional de Derechos de Autor), `accession` (palabras clave con forma de número de acceso, en secuencias), `doi`, `isbn`, `issn`. |
 | `links[]` | array | `{url, label}`: enlaces `<a>` del ítem y URL escritas en el texto (medio de verificación, "disponible en", plataforma, página web). Las que empiezan por `www.` reciben `http://`. |
 | `text` | string | Texto completo del ítem. |
 | `fields` | object o null | Pares etiqueta → valor (`Finalidad`, `Institución`, `Nombre comercial`, `contrato/registro`…). Los valores que antes seguían hasta el final del ítem (`"574273, . En: Colombia, ,2018, 0 meses p"`) se cortan donde empieza la parte sin rótulo; los vacíos o "n/a" se quitan. |
@@ -262,7 +269,31 @@ Cada ítem guarda el texto y, además, los campos estructurados que se puedan le
 
 Como en todo el JSON, un campo aparece en todos los ítems de una sección si tiene valor en alguno, y no aparece si está vacío en todos (§2).
 
-Ejemplo (Consultorías):
+Ejemplo de `patents[]` (la afiliación se abrevia):
+
+```json
+{
+  "type": "Producción técnica - Patente - Patente de invención",
+  "endorsed": true,
+  "title": "Ionic Gelation on Solids",
+  "authors": [
+    {"full_name": "Ana María Pérez Gómez", "id": "0000000001",
+     "external_ids": [{"provenance": "cvlac", "source": "scienti", "id": "0000000001"}],
+     "affiliations": [{"id": "03bp5hc83", "name": "Universidad de Antioquia", "years": [2010, 2011, "…"], "cvlac": {"provenance": "cvlac experience", "…": "…"}}]}
+  ],
+  "country": "Australia",
+  "institution": "Australian Patent Office",
+  "date": "2016-12-22",
+  "holder": "Universidad de Antioquia",
+  "identifiers": [{"source": "patent", "id": "AU 2014313817 B2"}],
+  "source": {"publisher": "AU2014313817B2", "publication_date": "2018-06-14", "international_publication": "WO2015028920A1"},
+  "text": "AU 2014313817 B2 - Ionic Gelation on Solids, Institución: Australian Patent Office, Vía de solicitud: Via Patent Cooperation Treaty (PCT) En: Australia, ,2016-12-22 00:00:00.0, . Nombre del solicitante de la patente: Universidad de Antioquia, . Gaceta Industrial de Publicación: AU2014313817B2· Fecha de publicación: 2018-06-14 Publicación Internacional: WO2015028920A1,",
+  "fields": {"Institución": "Australian Patent Office", "Vía de solicitud": "Via Patent Cooperation Treaty (PCT)"},
+  "year": 2016
+}
+```
+
+Ejemplo de `other_products["Consultorías"][]`:
 
 ```json
 {
@@ -270,8 +301,9 @@ Ejemplo (Consultorías):
   "endorsed": false,
   "title": "Componente de investigación en proyecto Implementación de estrategias de innovación…",
   "authors": [
-    {"full_name": "BETSELENE MURCIA ORDONEZ", "id": "0000157155", "external_ids": [{"provenance": "cvlac", "source": "scienti", "id": "0000157155"}]},
-    {"full_name": "LUIS CARLOS CHAVES MORENO", "id": null, "external_ids": []}
+    {"full_name": "BETSELENE MURCIA ORDONEZ", "id": "0000157155", "external_ids": [{"provenance": "cvlac", "source": "scienti", "id": "0000157155"}],
+     "affiliations": [{"id": "…", "name": "…", "cvlac": {"provenance": "cvlac experience", "…": "…"}}]},
+    {"full_name": "LUIS CARLOS CHAVES MORENO", "id": null, "external_ids": [], "affiliations": []}
   ],
   "country": "Colombia",
   "duration": {"value": 12, "unit": "meses"},
@@ -282,7 +314,7 @@ Ejemplo (Consultorías):
 }
 ```
 
-## 14. Tesis dirigidas: `sections["Trabajos dirigidos/tutorías"][]`
+## 14. Tesis dirigidas: `other_products["Trabajos dirigidos/tutorías"][]`
 
 Además de los campos genéricos, cada ítem tiene campos estructurados, leídos de la estructura de la página (el CvLAC separa con `&nbsp;` "DUEÑO, Título" / institución / "Estado: …" / programa / "AÑO. Dirigió como: ROL" / estudiantes / "N meses" / "Tutor(es)/Cotutor(es): …").
 
@@ -325,9 +357,11 @@ Objeto de conteos (enteros):
 | --- | --- |
 | `works`, `projects`, `events`, `education` | Registros de cada parte. |
 | `works:<sección>` | Obras por sección, p. ej. `works:Artículos`. |
-| `<título de sección>` | Ítems de cada sección de `sections`. |
+| `patents` | Ítems de `patents`. |
+| `<título de sección>` | Ítems de cada sección de `other_products`. |
 | `endorsed_works` | Obras con la marca de verificación. |
 | `works_with_affiliation` | Obras con al menos una afiliación del dueño. |
+| `products_with_affiliation` | Patentes y demás productos (sin las tesis) con al menos una afiliación del dueño. |
 | `works_only_in_scienti`, `section_items_only_in_scienti`, … | Solo con `--scienti full`. |
 
 ## 16. Afiliaciones y `affiliations_from_experience`
@@ -341,16 +375,16 @@ Las afiliaciones siguen la forma de ImpactU:
 | `types[]` | array | `{source: "ror", type}`: tipos ROR, p. ej. `education`, `funder` (los únicos vistos en los cinco CV), `company`, `government`. |
 | `external_ids[]` | array | `{provenance: "ror", source, id}`: `ror` (URL), `grid`, `isni`, `wikidata`, `fundref`. |
 | `addresses[]` | array | `{city, country, country_code}` del registro ROR. |
-| `years[]` | array de integer | En obras: todos los años de los periodos de experiencia. En tesis: el año de la tesis. |
+| `years[]` | array de integer | En obras, patentes y demás productos: todos los años de los periodos de experiencia. En tesis: el año de la tesis. |
 | `cvlac` | object | `provenance` ("cvlac experience" o "cvlac thesis"), `names[]` (nombres del CvLAC), `periods[]` (`{period, dedication}`, solo experiencia), `ror_match`. |
 
-En las obras, la afiliación es **inferida**: significa "el dueño trabajaba allí ese año", no que el CvLAC declare dónde se hizo la obra. Con dos empleos simultáneos aparecen ambos; varias entradas de la misma institución se fusionan en una.
+En las obras, patentes y demás productos (salvo las tesis, que llevan la institución de la tesis), la afiliación del dueño se calcula igual, con el año de la obra (`year_published`) o del ítem (`year`, o el año de `date`). Es **inferida**: significa "el dueño trabajaba allí ese año", no que el CvLAC declare dónde se hizo la obra. Con dos empleos simultáneos aparecen ambos; varias entradas de la misma institución se fusionan en una.
 
-`affiliations_from_experience` resume el proceso: `ror_api`, `experience` (entradas de experiencia), `experience_with_ror`, `works_with_affiliation`, `theses_with_affiliation`, `lookup_errors`.
+`affiliations_from_experience` resume el proceso: `ror_api`, `experience` (entradas de experiencia), `experience_with_ror`, `works_with_affiliation`, `products_with_affiliation`, `theses_with_affiliation`, `lookup_errors`.
 
 ## 17. Coincidencias con Scienti y SIIU
 
-**Objeto de coincidencia** (`works[].cvlac.scienti`, `projects[].scienti`, `events[].scienti`, `sections.*[].scienti`):
+**Objeto de coincidencia** (`works[].cvlac.scienti`, `projects[].scienti`, `events[].scienti`, `patents[].scienti`, `other_products.*[].scienti`):
 
 | Campo | Tipo | Descripción |
 | --- | --- | --- |
@@ -372,7 +406,7 @@ En las obras, la afiliación es **inferida**: significa "el dueño trabajaba all
 | `matched` | object | Coincidencias por parte: `works`, `section_items`, `projects`, `events`, `networks`. |
 | `records` | object | Registros Scienti recibidos: `projects`, `events`, `networks`, `patents`. |
 | `rules` | string | Descripción de las reglas aplicadas. |
-| `not_on_page` | object | Registros Scienti sin coincidencia, por la sección a la que pertenecerían: `works`, `sections` (por título), `projects`, `events`, `networks`. Con `--scienti full` se llama `added_from_scienti` y esos registros se agregan al JSON. |
+| `not_on_page` | object | Registros Scienti sin coincidencia, por la sección a la que pertenecerían: `works`, `patents`, `other_products` (por título de sección), `projects`, `events`, `networks` (hasta 0.6.0, patentes y demás productos se contaban juntos en `sections`). Con `--scienti full` se llama `added_from_scienti` y esos registros se agregan al JSON. |
 | `not_on_page_note` | string | Explicación del campo anterior. |
 | `note` | string | Solo si el COD_RH no está en ningún volcado. |
 
@@ -405,7 +439,7 @@ Si el registro de autor de Scienti no tiene documento, o el investigador no tien
 ## 18. Diferencias con `--scienti full`
 
 - Se agregan a `works` las obras bibliográficas que solo están en Scienti, con `id` `scienti:COD_RH-COD_PRODUCTO`, `types[]` con `source: "scienti"` y el `code` del tipo, autores en orden (`re_author_others`), revista/libro/evento, volumen y páginas, palabras clave, y `cvlac: {section, scienti}`.
-- Se agregan a `sections` los demás productos (a la sección cuyos ítems comparten al menos dos niveles del tipo), a `projects` y `events` los proyectos y eventos de Scienti sin coincidencia.
+- Se agregan a `patents` o a `other_products` los demás productos (a la sección cuyos ítems comparten al menos dos niveles del tipo), con el dueño como autor, a `projects` y `events` los proyectos y eventos de Scienti sin coincidencia.
 - Todos los registros llevan `origin` (`"cvlac"` o `"scienti"`), y `counts` incluye `*_only_in_scienti`.
 - Muchos de esos registros repiten una entrada de la página que no pasó la regla exacta (sobre todo jurados y comités): revíselos antes de contarlos como producción adicional.
 
@@ -427,8 +461,8 @@ Con `--format jsonld` (o `cvlac_json.to_jsonld(data, base=None)`) se obtiene el 
 | --- | --- |
 | `@id` del perfil | `--base` seguido del COD_RH; sin `--base`, la URL de la página del CvLAC (`url`) |
 | `@type` del perfil | `schema:ProfilePage` y `CvlacProfile` |
-| `@id` de obras, proyectos, eventos e ítems de `sections` | IRI del perfil más un JSON Pointer (RFC 6901) a su lugar en el documento: `…#/works/0`, `…#/sections/Trabajos%20dirigidos~1tutor%C3%ADas/3` |
-| `@type` de los registros | `works[]`: `schema:CreativeWork`; `projects[]`: `schema:ResearchProject`; `events[]`: `schema:Event`. Los ítems de `sections` no llevan tipo. |
+| `@id` de obras, proyectos, eventos, patentes e ítems de `other_products` | IRI del perfil más un JSON Pointer (RFC 6901) a su lugar en el documento: `…#/works/0`, `…#/patents/2`, `…#/other_products/Trabajos%20dirigidos~1tutor%C3%ADas/3` |
+| `@type` de los registros | `works[]`: `schema:CreativeWork`; `projects[]`: `schema:ResearchProject`; `events[]`: `schema:Event`; `patents[]`: [`Patent`](#Patent) (del vocabulario). Los ítems de `other_products` no llevan tipo. |
 | Vocabulario (`@vocab`) | `https://github.com/restrepo/cvlac-json/blob/main/docs/cvlac_json_esquema.md#`. Una clave sin término propio queda como ese prefijo más su nombre, y su significado es el de las tablas de este documento. |
 
 Claves con un término de schema.org o PROV:
@@ -448,6 +482,7 @@ Claves con un término de schema.org o PROV:
 
 - <a id="CvlacProfile"></a>`CvlacProfile` es el tipo del perfil completo que describe este documento.
 - Las etiquetas de `profile` con espacios o tildes ("Nombre en citaciones", "Categoría") reciben un término propio: el prefijo del vocabulario más la etiqueta codificada (`Nombre%20en%20citaciones`).
-- <a id="section"></a>`sections` es un mapa índice (`@container: @index`): en RDF cada ítem lleva la propiedad `section` con el título de su sección.
+- <a id="Patent"></a>`Patent` es el tipo de los ítems de `patents`.
+- <a id="section"></a>`other_products` es un mapa índice (`@container: @index`): en RDF cada ítem lleva la propiedad `section` con el título de su sección.
 - `counts` y `fields` quedan como literales JSON (`@type: @json`), porque sus claves son etiquetas abiertas de la página.
 - La conversión a RDF se puede comprobar con `pyld` (`pip install pyld`, luego `pyld.jsonld.to_rdf(doc)`). Las pruebas lo hacen si está instalado (`pip install -e ".[dev]"`).

@@ -77,9 +77,12 @@ def test_enrich_with_mocked_ror(page, monkeypatch):
     assert [e["ror"]["id"] for e in data["experience"]] == ["03bp5hc83", "059yx9a68"]
     aff = data["works"][0]["authors"][0]["affiliations"][0]
     assert aff["id"] == "03bp5hc83" and aff["name"] == "Universidad de Antioquia"
-    thesis = data["sections"]["Trabajos dirigidos/tutorías"][0]
+    thesis = data["other_products"]["Trabajos dirigidos/tutorías"][0]
     assert thesis["institution"]["id"] == "03bp5hc83"
     student = next(a for a in thesis["authors"] if a["type"] == "student")
     assert student["affiliations"][0]["id"] == "03bp5hc83"
     co = next(a for a in thesis["authors"] if a["type"] == "co-advisor")
     assert co["affiliations"] == []
+    (owner,) = data["patents"][0]["authors"]  # patents and other products: as works, by the item's year
+    assert owner["affiliations"] and owner["affiliations"][0]["cvlac"]["provenance"] == "cvlac experience"
+    assert data["counts"]["products_with_affiliation"] >= 1
