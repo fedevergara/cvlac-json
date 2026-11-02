@@ -13,6 +13,7 @@ htmlcov/
 # Generated CvLAC outputs and saved pages: they hold personal data, keep them out of the repository
 cvlac_[0-9]*.json
 cvlac_[0-9]*.html
+/data/
 # Never commit credentials
 .env
 .pypirc
