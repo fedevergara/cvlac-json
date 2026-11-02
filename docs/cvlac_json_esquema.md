@@ -404,7 +404,7 @@ En las obras, patentes y demás productos (salvo las tesis, que llevan la instit
 | `matched` | object | Coincidencias por parte: `works`, `section_items`, `projects`, `events`, `networks`. |
 | `records` | object | Registros Scienti recibidos: `projects`, `events`, `networks`, `patents`. |
 | `rules` | string | Descripción de las reglas aplicadas. |
-| `not_on_page` | object | Registros Scienti sin coincidencia, por la sección a la que pertenecerían: `works`, `sections` (patentes y demás productos, por título de sección), `projects`, `events`, `networks`. Con `--scienti full` se llama `added_from_scienti` y esos registros se agregan al JSON. |
+| `not_on_page` | object | Registros Scienti sin coincidencia, por la sección a la que pertenecerían: `works`, `patents`, `other_products` (por título de sección), `projects`, `events`, `networks` (hasta 0.6.0, patentes y demás productos se contaban juntos en `sections`). Con `--scienti full` se llama `added_from_scienti` y esos registros se agregan al JSON. |
 | `not_on_page_note` | string | Explicación del campo anterior. |
 | `note` | string | Solo si el COD_RH no está en ningún volcado. |
 

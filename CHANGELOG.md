@@ -5,7 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 ## [Sin publicar]
 
 ### Cambiado
-- **Cambio de esquema:** `sections` se llama ahora `other_products`, y las patentes (antes `sections["Patentes"]`) pasan a la lista `patents` del nivel superior, siempre presente. `counts` tiene `patents` en lugar de `Patentes`. En JSON-LD los ítems de `patents` tienen `@type` `Patent` y `@id` `…#/patents/n`; los de `other_products`, `…#/other_products/<sección>/n`. §4 y §13 del esquema.
+- **Cambio de esquema:** `sections` se llama ahora `other_products`, y las patentes (antes `sections["Patentes"]`) pasan a la lista `patents` del nivel superior, siempre presente. `counts` tiene `patents` en lugar de `Patentes`. En `scienti.not_on_page` (o `added_from_scienti`), el conteo `sections` se divide igual en `patents` y `other_products`. En JSON-LD los ítems de `patents` tienen `@type` `Patent` y `@id` `…#/patents/n`; los de `other_products`, `…#/other_products/<sección>/n`. §4 y §13 del esquema.
 
 ### Agregado
 - `authors[]` en todos los ítems de `patents` y `other_products`: las personas listadas en la página o, si no hay ninguna, el dueño solo. Cada autor tiene `affiliations`; las del dueño son, como en las obras, las instituciones de su experiencia cuyo periodo contiene el año del ítem (`year`, o el de `date`), salvo en las tesis, que siguen con la institución de la tesis. Nuevo conteo `products_with_affiliation` en `counts` y en `affiliations_from_experience`.

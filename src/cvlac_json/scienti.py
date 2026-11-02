@@ -415,7 +415,7 @@ def work_section(data, chain):
 def add_from_scienti(data, products, used, projects, events, networks, owner_id):
     """Put every Scienti record that no CvLAC entry matched into the section it belongs to (origin: 'scienti')."""
     owner_name = (data.get("profile") or {}).get("Nombre") or owner_id
-    added = {"works": 0, "sections": {}, "projects": 0, "events": 0, "networks": 0}  # sections: patents and other products
+    added = {"works": 0, "patents": 0, "other_products": {}, "projects": 0, "events": 0, "networks": 0}
     for p in products:
         pid = f"{p['COD_RH']}-{p['COD_PRODUCTO']}"
         if pid in used:
@@ -428,7 +428,10 @@ def add_from_scienti(data, products, used, projects, events, networks, owner_id)
         else:
             sec = item_section(data, chain) if chain else "Otros productos (Scienti)"
             product_list(data, sec).append(item_from_scienti(p, pid, chain))
-            added["sections"][sec] = added["sections"].get(sec, 0) + 1
+            if sec == "Patentes":
+                added["patents"] += 1
+            else:
+                added["other_products"][sec] = added["other_products"].get(sec, 0) + 1
     tagged = lambda lst: {e["scienti"]["id"] for e in lst if e.get("scienti")}
     have = tagged(data["projects"])
     for r in projects:
@@ -655,7 +658,7 @@ def enrich(data, cod_rh, institution=None, model_year=None, add_records=False, k
         f"scienti ({inst} {my}): products {n_used}/{len(index)} matched (works {n_works}, other items {n_items}); "
         f"projects {n_proj}/{len(projects)}, events {n_ev}/{len(events)}, networks {n_net}/{len(networks)}; "
         f"{'added from' if add_records else 'only in'} Scienti: works {added['works']}, "
-        f"section items {sum(added['sections'].values())}, projects {added['projects']}, "
+        f"patents {added['patents']}, other products {sum(added['other_products'].values())}, projects {added['projects']}, "
         f"events {added['events']}, networks {added['networks']}"
     )
     if siiu:

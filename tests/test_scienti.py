@@ -62,3 +62,16 @@ def test_enrich_without_key_is_skipped():
     msgs = []
     assert scienti.enrich({"works": []}, "0000000001", log=msgs.append) is False
     assert "no API key" in msgs[0]
+
+
+def test_added_counts_split_patents_and_other_products(monkeypatch):
+    sec = {"1": "Patentes", "2": "Softwares", "3": "Softwares"}
+    monkeypatch.setattr(scienti, "item_section", lambda data, chain: sec[chain[-1][1]])
+    monkeypatch.setattr(scienti, "type_chain", lambda p: [("Producción técnica", p["COD_PRODUCTO"])])
+    monkeypatch.setattr(scienti, "item_from_scienti", lambda p, pid, chain: {"text": pid})
+    data = {"profile": {}, "works": [], "patents": [], "other_products": {}, "projects": [], "events": []}
+    products = [{"COD_RH": "0000000001", "COD_PRODUCTO": c} for c in sec]
+    added = scienti.add_from_scienti(data, products, set(), [], [], [], "0000000001")
+    assert "sections" not in added
+    assert added["patents"] == 1 and added["other_products"] == {"Softwares": 2}
+    assert len(data["patents"]) == 1 and len(data["other_products"]["Softwares"]) == 2
