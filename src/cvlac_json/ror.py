@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resolve CvLAC experience institutions to ROR and add them as affiliations of the CV owner's works.
+"""Resolve CvLAC experience institutions to ROR and add them as affiliations of the CV owner's works and products.
 
     from cvlac_json import ror; ror.enrich(data)        # data = cvlac_json.parser.build(...)
 
@@ -11,9 +11,10 @@ ignored), or one name is a word prefix of the other (e.g. 'UNIVERSIDAD NACIONAL 
 MANIZALES' -> Universidad Nacional de Colombia); ROR's own 'chosen' flag is not trusted. Units such
 as 'FACULTAD DE ...' usually get no ROR. Answers are cached in ~/.cache/cvlac-json/ror.json.
 
-Then every work gets, on the owner's author entry, one affiliation per institution (merged by ROR
-id, else by name) whose experience period contains the work's year_published, in the ImpactU
-affiliation shape: {id, name, types, external_ids, addresses, years, cvlac}.
+Then every work, patent and other product (apart from supervised theses, which get the thesis institution) gets,
+on the owner's author entry, one affiliation per institution (merged by ROR id, else by name) whose experience
+period contains the year (works: year_published; patents and other products: year, else the year of date), in the
+ImpactU affiliation shape: {id, name, types, external_ids, addresses, years, cvlac}.
 Standard library only.
 """
 
@@ -128,10 +129,26 @@ def lookup(name, cache):
     return cache[k]
 
 
+def product_lists(data):
+    """(section title, items) of `patents` and of every `other_products` section."""
+    return [("Patentes", data.get("patents") or []), *(data.get("other_products") or {}).items()]
+
+
+def item_year(it):
+    """Year of a patent or other product: `year`, else the year of `date`."""
+    y = it.get("year")
+    if not y and re.match(r"\d{4}", it.get("date") or ""):
+        y = it["date"][:4]
+    try:
+        return int(y) if y else None
+    except (TypeError, ValueError):
+        return None
+
+
 def thesis_affiliations(data, cache, ror=True, lookup=lookup):
     """Supervised theses: the institution after the title goes, with its ROR id, to the advisor and the student(s)."""
     n = 0
-    for _title, items in data.get("sections", {}).items():
+    for _title, items in product_lists(data):
         for it in items:
             inst = it.get("institution")
             if not (isinstance(inst, dict) and inst.get("name") and it.get("authors")):
@@ -162,13 +179,13 @@ def thesis_affiliations(data, cache, ror=True, lookup=lookup):
 
 
 def enrich(data, ror=True, progress=None):
-    """Add start_year/end_year/ror to data['experience'] and owner affiliations to data['works']."""
+    """Add start_year/end_year/ror to data['experience'] and owner affiliations to works, patents and other products."""
     cache = _load_cache() if ror else {}
     progress = progress or (lambda stage, done=None, total=None: None)
     names = {norm(e.get("institution")) for e in data.get("experience", []) if e.get("institution")}
     names |= {
         norm(it["institution"]["name"])
-        for v in data.get("sections", {}).values()
+        for _, v in product_lists(data)
         for it in v
         if isinstance(it.get("institution"), dict) and it["institution"].get("name")
     }
@@ -198,11 +215,9 @@ def enrich(data, ror=True, progress=None):
         _save_cache(cache)
 
     cod = data["cod_rh"]
-    n_aff = 0
-    for w in data.get("works", []):
-        y = w.get("year_published")
-        if not y:
-            continue
+
+    def owner_affiliations(y):
+        """The owner's affiliations in year y: the experience held that year, one per institution."""
         affs = {}
         for e in exp:
             if not e["start_year"] or not (e["start_year"] <= y <= e["end_year"]):
@@ -229,11 +244,31 @@ def enrich(data, ror=True, progress=None):
             if e["institution"] not in a["cvlac"]["names"]:
                 a["cvlac"]["names"].append(e["institution"])
             a["cvlac"]["periods"].append({"period": e.get("period"), "dedication": e.get("dedication")})
-        for au in w.get("authors", []):
-            if au.get("id") == cod:
-                au["affiliations"] = list(affs.values())
-                n_aff += bool(affs)
+        return list(affs.values())
+
+    def tag(records, year):
+        n = 0
+        for rec in records:
+            y = year(rec)
+            if not y:
+                continue
+            affs = owner_affiliations(y)
+            for au in rec.get("authors") or []:
+                if au.get("id") == cod:
+                    au["affiliations"] = json.loads(json.dumps(affs))
+                    n += bool(affs)
+        return n
+
+    n_aff = tag(data.get("works", []), lambda w: w.get("year_published"))
     data["counts"]["works_with_affiliation"] = n_aff
+    products = [
+        it
+        for title, its in product_lists(data)
+        for it in its
+        if not title.lower().startswith("trabajos dirigidos")  # theses: the thesis institution (below)
+    ]
+    n_prod = tag(products, item_year)
+    data["counts"]["products_with_affiliation"] = n_prod
     n_th = thesis_affiliations(data, cache if ror else {}, ror, lookup=counted_lookup)
     if ror:
         _save_cache(cache)
@@ -243,6 +278,7 @@ def enrich(data, ror=True, progress=None):
         "experience_with_ror": found,
         "experience": len(exp),
         "works_with_affiliation": n_aff,
+        "products_with_affiliation": n_prod,
         "theses_with_affiliation": n_th,
         "lookup_errors": errors,
     }

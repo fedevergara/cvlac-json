@@ -4,12 +4,12 @@ Reads https://scienti.minciencias.gov.co/cvlac/visualizador/generarCurriculoCv.d
 (or a saved copy with --html) and writes one JSON with:
   profile, identifiers, academic_networks, education, experience, areas, languages,
   research_lines, awards, works (bibliographic production in the ImpactU work schema),
-  projects, events, sections (every other section as generic items), counts.
+  projects, events, patents, other_products (every other section, by title), counts.
 With an apis.colav.co key (--apikey, else $COLAV_APIKEY, else ~/.config/colav/apikey) it also adds the Scienti ids
 (COD_RH-COD_PRODUCTO, -COD_PROYECTO, -COD_EVENTO, -COD_RED) of matching entries (scienti.py);
 --scienti full also adds the Scienti records missing from the page.
-Experience institutions are resolved to ROR ids and added as the owner's affiliations on every work
-whose year falls in the experience period (ror.py).
+Experience institutions are resolved to ROR ids and added as the owner's affiliations on every work, patent and
+other product whose year falls in the experience period (ror.py).
 Standard library only.
 """
 
@@ -39,6 +39,7 @@ MONTHS = {
         ]
     )
 }
+PATENTS = "Patentes"  # this section goes to the top-level `patents` list
 # Sections whose items are bibliographic works (mapped to the ImpactU work schema)
 BIBLIO = {
     "artículos",
@@ -736,7 +737,8 @@ def build(page, cod_rh):
         "works": [],
         "projects": [],
         "events": [],
-        "sections": {},
+        "patents": [],
+        "other_products": {},
         "counts": {},
     }
     if not secs:
@@ -772,22 +774,23 @@ def build(page, cod_rh):
             its = items(frag)
             if low in BIBLIO or any((h or "").startswith("Producción bibliográfica") for h, _, _ in its):
                 continue  # handled below, after the profile is known
-            out["sections"][title] = [generic(*i) for i in its]
+            out["other_products"][title] = [generic(*i) for i in its]
     p = out["profile"]
     owner = {"cod_rh": cod_rh, "name": p.get("Nombre"), "citation_name": p.get("Nombre en citaciones")}
-    for title in list(out["sections"]):
+    prods = out["other_products"]
+    for title in list(prods):
         if title.lower().startswith("trabajos dirigidos") and title in raw_secs:
             raw_items = items(raw_secs[title])
-            if len(raw_items) == len(out["sections"][title]):
-                out["sections"][title] = [
-                    parse_thesis(it, raw, owner) for it, raw in zip(out["sections"][title], raw_items, strict=False)
-                ]
+            if len(raw_items) == len(prods[title]):
+                prods[title] = [parse_thesis(it, raw, owner) for it, raw in zip(prods[title], raw_items, strict=False)]
         else:
             from .other_sections import structure
 
             bqs = [bq for _, _, bq in items(dict(secs)[title])]
-            if len(bqs) == len(out["sections"][title]):
-                out["sections"][title] = [structure(it, bq, owner) for it, bq in zip(out["sections"][title], bqs, strict=True)]
+            if len(bqs) == len(prods[title]):
+                prods[title] = [structure(it, bq, owner) for it, bq in zip(prods[title], bqs, strict=True)]
+    out["patents"] = prods.pop(PATENTS, [])
+    add_owner(out)
     for title, frag in secs:
         its = items(frag)
         if title.lower() in BIBLIO or any((h or "").startswith("Producción bibliográfica") for h, _, _ in its):
@@ -795,6 +798,42 @@ def build(page, cod_rh):
                 out["works"].append(work_from_item(title, hdr, endorsed, bq, owner, len(out["works"]) + 1))
     count(out)
     return out
+
+
+def product_lists(data):
+    """(section title, items) of `patents` and of every `other_products` section."""
+    return [(PATENTS, data.get("patents") or []), *(data.get("other_products") or {}).items()]
+
+
+def product_list(data, title):
+    """The item list of one section: `patents` for Patentes, else other_products[title] (created when missing)."""
+    if title == PATENTS:
+        return data.setdefault("patents", [])
+    return data.setdefault("other_products", {}).setdefault(title, [])
+
+
+def owner_author(data):
+    cod = data["cod_rh"]
+    return {
+        "full_name": (data.get("profile") or {}).get("Nombre"),
+        "id": cod,
+        "external_ids": [{"provenance": "cvlac", "source": "scienti", "id": cod}],
+        "affiliations": [],
+    }
+
+
+def add_owner(data):
+    """Every patent and other product gets `authors`: the people listed on the page, or else the owner alone.
+    Each author has `affiliations` (the owner's are filled from the experience by ror.enrich, as for works)."""
+    for _, its in product_lists(data):
+        for it in its:
+            if not it.get("authors"):
+                head = {k: it[k] for k in ("type", "endorsed", "title") if k in it}
+                rest = {k: v for k, v in it.items() if k not in head and k != "authors"}
+                it.clear()
+                it.update({**head, "authors": [owner_author(data)], **rest})
+            for a in it["authors"]:
+                a.setdefault("affiliations", [])
 
 
 def count(out):
@@ -808,17 +847,19 @@ def count(out):
     for w in out["works"]:
         k = "works:" + w["cvlac"]["section"]
         c[k] = c.get(k, 0) + 1
-    c.update({k: len(v) for k, v in out["sections"].items()})
+    c["patents"] = len(out["patents"])
+    c.update({k: len(v) for k, v in out["other_products"].items()})
     c["endorsed_works"] = sum(bool(w["cvlac"].get("endorsed")) for w in out["works"])
     for k in ("works", "projects", "events"):
         n = sum(x.get("origin") == "scienti" for x in out[k])
         if n:
             c[f"{k}_only_in_scienti"] = n
-    n = sum(it.get("origin") == "scienti" for v in out["sections"].values() for it in v)
+    n = sum(it.get("origin") == "scienti" for _, v in product_lists(out) for it in v)
     if n:
         c["section_items_only_in_scienti"] = n
-    if "works_with_affiliation" in old:
-        c["works_with_affiliation"] = old["works_with_affiliation"]
+    for k in ("works_with_affiliation", "products_with_affiliation"):
+        if k in old:
+            c[k] = old[k]
     out["counts"] = c
 
 
@@ -851,15 +892,15 @@ def harmonize(records):
 
 
 def tidy(data):
-    """Same keys for every record of a section (works, projects, events, each `sections` list...)."""
-    recs = [x for k in ("works", "projects", "events") for x in data[k]] + [x for v in data["sections"].values() for x in v]
+    """Same keys for every record of a section (works, projects, events, patents, each `other_products` list...)."""
+    recs = [x for k in ("works", "projects", "events") for x in data[k]] + [x for _, v in product_lists(data) for x in v]
     if any(x.get("origin") == "scienti" for x in recs):  # only with --scienti full
         for x in recs:
             x.setdefault("origin", "cvlac")
     for k, v in data.items():
         if isinstance(v, list):
             harmonize(v)
-        elif k in ("education", "sections"):
+        elif k in ("education", "other_products"):
             for x in v.values():
                 harmonize(x)
     return data
@@ -935,6 +976,7 @@ def extract(
             )
         except RuntimeError as e:
             log(f"scienti: skipped ({e})")
+        add_owner(data)  # items added from Scienti
     ror_affiliations.enrich(data, ror=ror, progress=progress)
     progress("Finishing")
     count(data)

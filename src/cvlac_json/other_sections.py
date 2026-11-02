@@ -1,11 +1,13 @@
-"""Structured fields for the items of the other CvLAC sections (`sections`, apart from supervised theses).
+"""Structured fields for the items of the other CvLAC sections (`patents` and `other_products`, apart from supervised theses).
 
 Each item keeps `type`, `endorsed`, `text`, `fields`, `keywords`, `areas`, `sectors` and `year`, and gains, when the
 text has them:
   title, authors[] (each person listed before the title; the owner gets the COD_RH), country, city, institution,
   publisher, date (YYYY-MM-DD, YYYY-MM or YYYY), duration ({value, unit}), pages, role, purpose,
-  identifiers[] ({source, id}: contract/registration, patent, NIT, register numbers, accession, DOI, ISBN, ISSN)
-  and links[] (URLs written in the text, besides any <a> link).
+  identifiers[] ({source, id}: contract/registration, patent, NIT, register numbers, accession, DOI, ISBN, ISSN),
+  links[] (URLs written in the text, besides any <a> link) and, for patents, source.publisher (what follows
+  "Gaceta Industrial de Publicación:").
+A patent's number is the text before the first " - " (spaces kept: 'AU 2014313817 B2 - Ionic Gelation...').
 `fields` values that ran into the next, unlabeled part of the text (". En: Colombia, ,2017, 0 meses p.") are cut.
 
 Authors come from the page layout: the CvLAC writes each person on its own source line, ending in a comma and a run
@@ -169,7 +171,9 @@ def structure(it, bq, owner):
 
     # title
     title = next((clean(f[k]) for k in TITLE_FIELDS if f.get(k)), None)
-    m_pat = re.match(r"(\S+)\s+-\s+(.+?),\s*Institución:", flat)  # Patentes: 'NC2020/0015295 - TITLE, Institución:'
+    patent = "Gaceta Industrial de Publicación:" in flat or "solicitante de la patente:" in flat
+    # Patentes: 'NC2020/0015295 - TITLE, Institución:' / 'AU 2014313817 B2 - TITLE, Institución:'
+    m_pat = re.match(r"(.+?)\s+-\s+(.+?),\s*Institución:", flat) if patent else None
     m_quote = re.match(r'"+(.+?)"\s*Fecha de presentación', body)  # Boletines
     if not title and m_pat:
         title = clean(m_pat.group(2))
@@ -278,6 +282,9 @@ def structure(it, bq, owner):
     m = re.search(r"Gaceta Industrial de Publicación:\s*(\d+)", flat)
     if m:
         _add_id(ids, "gazette", m.group(1))
+    m = re.search(r"Gaceta Industrial de Publicación:\s*(.*?)\s*,?\s*$", flat)
+    if m and clean(m.group(1)) and clean(m.group(1)).lower() not in EMPTY:
+        out["source"] = {"publisher": clean(m.group(1))}
     db = f.get("Base de datos donde está incluido el registro") or f.get(
         "Nombre de base de datos donde está incluido el registro"
     )

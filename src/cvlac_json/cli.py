@@ -97,7 +97,8 @@ def main(argv=None):
     c = data["counts"]
     print(
         f"wrote {out}: {data['profile'].get('Nombre') or '?'} | works {c['works']} (endorsed {c['endorsed_works']}), "
-        f"projects {c['projects']}, events {c['events']}, other sections {len(data['sections'])}",
+        f"projects {c['projects']}, events {c['events']}, patents {c['patents']}, "
+        f"other product sections {len(data['other_products'])}",
         file=sys.stderr,
     )
     return 0

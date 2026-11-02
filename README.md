@@ -4,7 +4,7 @@
 [![PyPI](https://img.shields.io/pypi/v/cvlac-json.svg)](https://pypi.org/project/cvlac-json/)
 [![Python](https://img.shields.io/pypi/pyversions/cvlac-json.svg)](https://pypi.org/project/cvlac-json/)
 
-Convierte la página pública del **CvLAC** de un investigador (Minciencias, Colombia) en un único documento JSON: perfil, formación, experiencia, producción bibliográfica en el esquema de obras de [ImpactU](https://impactu.colav.co), proyectos, eventos, tesis dirigidas y todas las demás secciones, con autores, título, lugar, fechas, identificadores y enlaces de cada ítem.
+Convierte la página pública del **CvLAC** de un investigador (Minciencias, Colombia) en un único documento JSON: perfil, formación, experiencia, producción bibliográfica en el esquema de obras de [ImpactU](https://impactu.colav.co), proyectos, eventos, patentes (`patents`) y todos los demás productos (`other_products`: tesis dirigidas y las demás secciones), con autores (y la afiliación del dueño, como en las obras), título, lugar, fechas, identificadores y enlaces de cada ítem.
 
 - Sin dependencias: solo la biblioteca estándar de Python (3.10 o superior).
 - Agrega los **identificadores ROR** de las instituciones de la experiencia y de las tesis.
@@ -75,7 +75,7 @@ cvlac-json 0000026549 --format jsonld --base https://ejemplo.org/cvlac/ # @id = 
 ```
 
 - Ninguna clave cambia de nombre ni de valor; el contexto usa schema.org donde el significado es claro y el vocabulario de este esquema en lo demás.
-- Obras, proyectos, eventos e ítems de las demás secciones tienen un `@id` con un JSON Pointer a su lugar en el documento: `…/0000026549#/works/0`.
+- Obras, proyectos, eventos, patentes e ítems de `other_products` tienen un `@id` con un JSON Pointer a su lugar en el documento: `…/0000026549#/works/0`.
 - `authors` es una lista ordenada (el orden de la cita se conserva en RDF); `counts` y `fields` quedan como literales JSON.
 - El contexto completo, con la correspondencia de cada clave, está en la [sección 20 del esquema](docs/cvlac_json_esquema.md#20-json-ld).
 
