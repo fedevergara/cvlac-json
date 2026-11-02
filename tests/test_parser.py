@@ -3,6 +3,7 @@ import datetime as dt
 import pytest
 
 from cvlac_json import extract, normalize_cod_rh
+from cvlac_json.other_sections import gazette_source
 from cvlac_json.parser import build, find_doi, items, product_lists, work_from_item
 
 COD = "0000000001"
@@ -249,16 +250,36 @@ def test_section_patent(data):
     assert p["date"] == "2020-12-07" and p["country"] == "Colombia"
     assert p["holder"] == "UNIVERSIDAD DE ANTIOQUIA"
     assert p["identifiers"] == [{"source": "patent", "id": "NC2020/0000001"}, {"source": "gazette", "id": "39514"}]
-    assert p["source"] == {"publisher": "39514"}
+    assert p["source"]["publisher"] == "39514"  # other keys are null: harmonized with the second patent
 
 
 def test_patent_number_with_spaces_and_gazette_publisher(data):
     q = data["patents"][1]
     assert q["identifiers"][0] == {"source": "patent", "id": "AU 2099000001 B2"}  # up to the first ' - '
     assert q["title"] == "Synthetic Test Method - Second Part"
-    assert q["source"] == {
-        "publisher": "AU2099000001B2· Fecha de publicación: 2018-06-14 Publicación Internacional: WO2099000001A1"
+    assert q["source"] == {  # 'value label: value label: value', with '· ' or ' ' between items
+        "publisher": "AU2099000001B2",
+        "publication_date": "2018-06-14",
+        "international_publication": "WO2099000001A1",
     }
+
+
+def test_gazette_source():
+    assert gazette_source(" Gaceta: 880 Fecha de Publicación: 10 dic 2019,") == {
+        "gazette": "880",
+        "publication_date": "10 dic 2019",
+    }
+    assert gazette_source(" Numero 620, fecha: 20/09/2010, np:106,") == {
+        "publisher": "Numero 620",
+        "date": "20/09/2010",
+        "np": "106",
+    }
+    assert gazette_source(" Superintendencia de Industria y Comercio Gaceta: 854,") == {
+        "publisher": "Superintendencia de Industria y Comercio",
+        "gazette": "854",
+    }
+    assert gazette_source(" https://www.uspto.gov/,") == {"publisher": "https://www.uspto.gov"}
+    assert gazette_source(" No aplica,") == {}
 
 
 def test_products_always_have_authors(data):
