@@ -4,6 +4,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 
 ## [Sin publicar]
 
+## [0.9.0] - 2026-11-02
+
 ### Agregado
 - `product_hash` en la entrada del dueño en `authors[]` de cada obra, proyecto, patente y demás producto: el SHA-1 de `título|COD_RH|tipo|año` (título en minúsculas, sin tildes, solo letras y dígitos; tipo `work`, `project`, `patent` u `other`), con `|n` para el n-ésimo registro del CV con la misma clave, así que es único en el CV. gruplac-json calcula el mismo valor para cada integrante autor de un producto del GrupLAC. Función `cvlac_json.product_hash()`, módulo `cvlac_json.product_hash` (solo biblioteca estándar, el mismo en los dos paquetes), casos fijos en `tests/product_hash_vectors.json` y conteo `product_hash_repeated`. README y §21 del esquema.
 
@@ -84,7 +86,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - Tesis dirigidas con título, director, codirectores, estudiantes, institución con ROR, estado y programa.
 - Identificadores Scienti por DOI o título (`--scienti auto|full|off`, `--apikey`).
 
-[Sin publicar]: https://github.com/restrepo/cvlac-json/compare/v0.8.1...HEAD
+[Sin publicar]: https://github.com/restrepo/cvlac-json/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/restrepo/cvlac-json/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/restrepo/cvlac-json/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/restrepo/cvlac-json/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/restrepo/cvlac-json/compare/v0.6.0...v0.7.0
