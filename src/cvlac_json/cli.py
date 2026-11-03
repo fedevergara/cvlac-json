@@ -90,7 +90,13 @@ def main(argv=None):
     doc = to_jsonld(data, base=a.base) if a.format == "jsonld" else data
     text = json.dumps(doc, ensure_ascii=False, indent=1)
     if out == "-":
-        sys.stdout.write(text + "\n")
+        buf = getattr(sys.stdout, "buffer", None)
+        if buf is None:  # stdout replaced by a text-only stream
+            sys.stdout.write(text + "\n")
+        else:  # JSON is UTF-8 whatever the console's code page (cp1252 on Windows pipes)
+            sys.stdout.flush()
+            buf.write((text + "\n").encode("utf-8"))
+            buf.flush()
     else:
         with open(out, "w", encoding="utf-8") as fh:
             fh.write(text)

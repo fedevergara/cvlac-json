@@ -4,6 +4,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 
 ## [Sin publicar]
 
+### Agregado
+- Pruebas de extremo a extremo sobre una página de juguete (`tests/fixtures/cvlac_juguete.html`, `tests/test_juguete.py`): el dueño en cada registro, la afiliación por año con dos empleos, el comando en JSON y JSON-LD. El flujo Release las corre sobre la rueda construida (Linux con Python 3.10 y 3.14, Windows, macOS) antes de publicar en PyPI.
+
+### Corregido
+- `-o -` escribe el JSON en UTF-8 aunque la consola use otra codificación (cp1252 en las tuberías de Windows), donde antes salía en esa codificación o fallaba.
+
 ## [0.8.0] - 2026-11-02
 
 ### Agregado
