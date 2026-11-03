@@ -94,6 +94,11 @@ def test_owner_once_in_every_record(toy):
         assert sum(a.get("id") == COD for a in r["authors"]) == 1, r.get("title")
     for ev in toy["events"]:
         assert sum(p["id"] == COD for p in ev["participants"]) == 1, ev["name"]
+    hashes = [owner(r["authors"])["product_hash"] for r in recs]
+    assert len(set(hashes)) == 7 and all(len(h) == 40 for h in hashes)
+    assert owner(toy["works"][0]["authors"])["product_hash"] == cvlac_json.product_hash(
+        "Un artículo de juguete con DOI", COD, "work", 2019
+    )
 
 
 def test_works(toy):

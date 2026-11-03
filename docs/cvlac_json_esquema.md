@@ -180,6 +180,7 @@ Incluye las secciones Artículos, Libros, Capítulos de libro, Textos en publica
 | `id` | string o null | COD_RH del dueño del CV; `null` para los demás autores. |
 | `external_ids[]` | array | `{provenance: "cvlac", source: "scienti", id: COD_RH}` para el dueño. |
 | `affiliations[]` | array | Solo el dueño: instituciones de su experiencia cuyo periodo contiene `year_published` (§16). Los coautores no tienen afiliación (la página no la da). |
+| `product_hash` | string o null | Solo el dueño: identificador del producto, reproducible desde el GrupLAC (§21). | `"efc8d0bb2fa5…"` |
 
 **El dueño está en todos los registros.** En obras, proyectos, patentes y demás productos (y en los `participants` de los eventos), el dueño del CV aparece siempre, con su COD_RH. Se reconoce por su nombre completo o su nombre en citaciones (o las mismas palabras de este). Si ninguna persona listada lo es, se toma como dueño la única que sea una forma abreviada de su nombre: al menos dos palabras, una de tres letras o más, todas del nombre del dueño, y cada inicial suelta la de una de ellas ("VICTOR ALONSO MOLINA", "CANO, L.E"). Si tampoco hay una, el dueño se agrega al final de la lista. Los dos casos se cuentan en `counts.owner_by_name_variant` y `counts.owner_added`. Las partes con rótulo ("Nombre del producto: …") no son autores.
 
@@ -243,7 +244,7 @@ Los ítems de `patents` y de `other_products` tienen la misma forma: el texto y,
 | `type` | string | Tipo de producto del CvLAC, niveles separados por " - " (p. ej. "Producción técnica - Cursos de corta duración dictados - Extensión extracurricular"). En Asesorías y Secretos empresariales la página pone ahí el nombre del producto. Falta si toda la sección lo tiene vacío. |
 | `endorsed` | boolean | Marca de verificación. |
 | `title` | string o null | Nombre del producto: el texto entre las personas y el primer dato rotulado, o el valor de "Nombre del producto", "Titulo", "Nombre de la red", "Nombre del evento"… |
-| `authors[]` | array | **Siempre presente.** Las personas escritas antes del título, en orden; si la página no lista a nadie, el dueño del CV solo. La página pone cada persona en su propia línea, terminada en coma, y así se separan del título aunque este tenga comas. Cada una es `{full_name, id, external_ids, affiliations}`, como en las obras (§10): el dueño lleva su COD_RH en `id` y en `external_ids`, y en `affiliations` las instituciones de su experiencia cuyo periodo contiene el año del ítem (`year`, o el de `date`) (§16); las demás personas tienen `id: null` y `affiliations: []`. En Jurado en comités de evaluación son los jurados (`type: "jury"`) y los orientados (`type: "student"`). |
+| `authors[]` | array | **Siempre presente.** Las personas escritas antes del título, en orden; si la página no lista a nadie, el dueño del CV solo. La página pone cada persona en su propia línea, terminada en coma, y así se separan del título aunque este tenga comas. Cada una es `{full_name, id, external_ids, affiliations}`, como en las obras (§10): el dueño lleva su COD_RH en `id` y en `external_ids`, en `affiliations` las instituciones de su experiencia cuyo periodo contiene el año del ítem (`year`, o el de `date`) (§16), y su `product_hash` (§21); las demás personas tienen `id: null` y `affiliations: []`. En Jurado en comités de evaluación son los jurados (`type: "jury"`) y los orientados (`type: "student"`). |
 | `country`, `city` | string | País ("En: Colombia") y ciudad ("En: MEDELLÍN", "Ciudad: …"). |
 | `place` | string | Lugar de realización (Talleres creativos). |
 | `institution` | string | Institución del ítem: la de "Institución", la solicitante de un concepto técnico, la que emite un registro, la del curso o el comité ("en: …"). |
@@ -367,6 +368,7 @@ Objeto de conteos (enteros):
 | `projects_with_affiliation` | Proyectos con al menos una afiliación del dueño. |
 | `events_with_affiliation` | Eventos con al menos una afiliación del dueño en `participants`. |
 | `owner_by_name_variant`, `owner_added` | Registros en que el dueño se reconoció por una forma abreviada de su nombre, o se agregó porque no estaba en la lista (§10). |
+| `product_hash_repeated` | Registros cuya clave de `product_hash` ya tenía otro registro del CV y llevan un número de repetición (§21). |
 | `products_with_affiliation` | Patentes y demás productos (sin las tesis) con al menos una afiliación del dueño. |
 | `works_only_in_scienti`, `section_items_only_in_scienti`, … | Solo con `--scienti full`. |
 
@@ -494,3 +496,32 @@ Claves con un término de schema.org o PROV:
 - <a id="section"></a>`other_products` es un mapa índice (`@container: @index`): en RDF cada ítem lleva la propiedad `section` con el título de su sección.
 - `counts` y `fields` quedan como literales JSON (`@type: @json`), porque sus claves son etiquetas abiertas de la página.
 - La conversión a RDF se puede comprobar con `pyld` (`pip install pyld`, luego `pyld.jsonld.to_rdf(doc)`). Las pruebas lo hacen si está instalado (`pip install -e ".[dev]"`).
+
+## 21. Identificador de producto: `product_hash`
+
+Cada obra, proyecto, patente y demás producto lleva, en la entrada del dueño en `authors[]`, un `product_hash`: un identificador de 40 caracteres hexadecimales que sale solo del contenido del registro. El paquete [gruplac-json](https://github.com/restrepo/gruplac-json) calcula el mismo valor para cada integrante autor de un producto del GrupLAC, así que sirve para unir un producto del CvLAC con el mismo producto en el GrupLAC de su grupo, y para comparar dos descargas del mismo CvLAC.
+
+**Cómo se calcula.** Es el SHA-1 de la clave
+
+```
+<título>|<COD_RH>|<tipo>|<año>
+```
+
+| Parte | Regla | Ejemplo |
+| --- | --- | --- |
+| título | En minúsculas, sin tildes ni otras marcas (Unicode NFKD y luego solo ASCII: "Física" → "fisica", la letra matemática "𝐽" → "j"), y solo con las letras `a`–`z` y los dígitos `0`–`9`: los espacios y la puntuación no cuentan. Un título vacío da `""`. | "Bleomicina: Una revisión" → `bleomicinaunarevision` |
+| COD_RH | El de la persona, con 10 dígitos. | `0000707619` |
+| tipo | `work` (producción bibliográfica, `works`), `project` (`projects`), `patent` (`patents`) u `other` (cualquier sección de `other_products`). Los eventos no tienen `product_hash`. | `work` |
+| año | Obras: `year_published`. Proyectos: el año de `start`. Patentes y demás productos: `year`, o el año de `date`. Vacío si no hay. | `2024` |
+
+Ejemplo: "Singlet Dirac dark matter streamlined", de `0000707619`, publicado en 2024, tiene la clave `singletdiracdarkmatterstreamlined|0000707619|work|2024` y el `product_hash` `efc8d0bb2fa5…` (SHA-1 de la clave en ASCII).
+
+**Único en el CV.** Si varios registros de la persona dan la misma clave (el mismo producto escrito dos veces, un curso dictado dos veces el mismo año, o ítems sin título como las revisiones de Par evaluador del mismo año), el primero conserva la clave y el n-ésimo, en el orden de la página, la lleva con `|n` al final (`…|work|2024|2`). `counts.product_hash_repeated` cuenta esos registros. Así no hay dos registros con el mismo `product_hash` en un CV. El primero es el que otra fuente reproduce; uno repetido coincide solo si la otra fuente lista las mismas repeticiones en el mismo orden.
+
+**Dónde va.** En la entrada del dueño en `authors[]` (la que tiene su COD_RH en `id`); las demás personas tienen `product_hash: null`. En un GrupLAC cada producto lista a todos los integrantes que lo firmaron, y cada uno lleva el hash calculado con su propio COD_RH: un artículo de dos integrantes tiene dos `product_hash`, uno igual al del CV de cada uno.
+
+**Qué no lo reproduce.** El hash cambia si cambia el título (más allá de mayúsculas, tildes, espacios y puntuación), el año o el tipo. En nueve grupos de muestra, comparados con los CvLAC de sus integrantes de la UdeA (2026-11-02), el hash del GrupLAC está en el CV del integrante en 971 de 1.142 parejas de obra e integrante (85 %) y en 122 de 251 de los demás productos (49 %). Las diferencias son títulos editados en una de las dos páginas ("polychorinated" y "polychlorinated"), años distintos (frecuentes en los demás productos) y productos que no están en el CV. Los proyectos del GrupLAC no tienen autores, así que su hash no se puede calcular desde el GrupLAC. Cuando hay clave de apis.colav.co, el id de Scienti (`COD_RH-COD_PRODUCTO`, §17) identifica el registro de origen de las dos páginas y no depende del título.
+
+**En Python.** `cvlac_json.product_hash(título, cod_rh, tipo, año=None, n=1)` da el hash; `cvlac_json.product_hash.hash_key(...)`, la clave; `cvlac_json.product_hash.product_hashes(registros, cod_rh)`, los hashes únicos de una lista de `(título, tipo, año)` en orden. El módulo `product_hash.py` solo usa la biblioteca estándar y es el mismo en gruplac-json; los casos de `tests/product_hash_vectors.json` fijan su resultado en los dos paquetes.
+
+- A diferencia de la biblioteca `unidecode`, las letras que no tienen forma ASCII se quitan en lugar de transliterarse: "ß" y las letras griegas (𝜓) no aportan nada a la clave.
