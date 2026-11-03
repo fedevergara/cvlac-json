@@ -4,6 +4,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 
 ## [Sin publicar]
 
+## [0.8.1] - 2026-11-02
+
 ### Agregado
 - Pruebas de extremo a extremo sobre una página de juguete (`tests/fixtures/cvlac_juguete.html`, `tests/test_juguete.py`): el dueño en cada registro, la afiliación por año con dos empleos, el comando en JSON y JSON-LD. El flujo Release las corre sobre la rueda construida (Linux con Python 3.10 y 3.14, Windows, macOS) antes de publicar en PyPI.
 
@@ -79,7 +81,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - Tesis dirigidas con título, director, codirectores, estudiantes, institución con ROR, estado y programa.
 - Identificadores Scienti por DOI o título (`--scienti auto|full|off`, `--apikey`).
 
-[Sin publicar]: https://github.com/restrepo/cvlac-json/compare/v0.8.0...HEAD
+[Sin publicar]: https://github.com/restrepo/cvlac-json/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/restrepo/cvlac-json/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/restrepo/cvlac-json/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/restrepo/cvlac-json/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/restrepo/cvlac-json/compare/v0.5.0...v0.6.0
