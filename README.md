@@ -79,6 +79,22 @@ cvlac-json 0000026549 --format jsonld --base https://ejemplo.org/cvlac/ # @id = 
 - `authors` es una lista ordenada (el orden de la cita se conserva en RDF); `counts` y `fields` quedan como literales JSON.
 - El contexto completo, con la correspondencia de cada clave, está en la [sección 20 del esquema](docs/cvlac_json_esquema.md#20-json-ld).
 
+## Identificador de producto (`product_hash`)
+
+Cada obra, proyecto, patente y demás producto lleva, en la entrada del dueño en `authors[]`, un `product_hash`: el SHA-1 de `título|COD_RH|tipo|año`, con el título en minúsculas, sin tildes y solo con letras y dígitos, y el tipo `work`, `project`, `patent` u `other`. [gruplac-json](https://github.com/restrepo/gruplac-json) calcula el mismo valor para cada integrante autor de un producto del GrupLAC, así que el hash une un producto del CvLAC con el del GrupLAC de su grupo sin depender de mayúsculas, tildes, espacios ni puntuación. Es único en cada CV: si dos registros dan la misma clave, el segundo lleva `|2` al final, el tercero `|3`…
+
+```python
+from cvlac_json import product_hash
+from cvlac_json.product_hash import hash_key
+
+hash_key("Singlet Dirac dark matter streamlined", "0000707619", "work", 2024)
+# 'singletdiracdarkmatterstreamlined|0000707619|work|2024'
+product_hash("Singlet Dirac dark matter streamlined", "0000707619", "work", 2024)
+# 'efc8d0bb2fa5…' (40 caracteres)
+```
+
+Cambia si cambia el título (más allá de esas diferencias), el año o el tipo. Reglas, ejemplos y cuánto coincide con el GrupLAC: [§21 del esquema](docs/cvlac_json_esquema.md#21-identificador-de-producto-product_hash).
+
 ## Esquema del JSON
 
 El esquema completo, campo por campo, está en [docs/cvlac_json_esquema.md](docs/cvlac_json_esquema.md) y en versión navegable en [docs/cvlac_json_esquema.html](docs/cvlac_json_esquema.html).

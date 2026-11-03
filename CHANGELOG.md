@@ -4,6 +4,9 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 
 ## [Sin publicar]
 
+### Agregado
+- `product_hash` en la entrada del dueño en `authors[]` de cada obra, proyecto, patente y demás producto: el SHA-1 de `título|COD_RH|tipo|año` (título en minúsculas, sin tildes, solo letras y dígitos; tipo `work`, `project`, `patent` u `other`), con `|n` para el n-ésimo registro del CV con la misma clave, así que es único en el CV. gruplac-json calcula el mismo valor para cada integrante autor de un producto del GrupLAC. Función `cvlac_json.product_hash()`, módulo `cvlac_json.product_hash` (solo biblioteca estándar, el mismo en los dos paquetes), casos fijos en `tests/product_hash_vectors.json` y conteo `product_hash_repeated`. README y §21 del esquema.
+
 ## [0.8.1] - 2026-11-02
 
 ### Agregado

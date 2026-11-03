@@ -9,10 +9,11 @@ from importlib.metadata import PackageNotFoundError, version
 
 from .jsonld import to_jsonld
 from .parser import build, extract, fetch, normalize_cod_rh
+from .product_hash import product_hash
 
 try:
     __version__ = version("cvlac-json")
 except PackageNotFoundError:  # running from a source tree without installing
     __version__ = "0.0.0"
 
-__all__ = ["__version__", "build", "extract", "fetch", "normalize_cod_rh", "to_jsonld"]
+__all__ = ["__version__", "build", "extract", "fetch", "normalize_cod_rh", "product_hash", "to_jsonld"]
